@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 
 const team = [
   {
@@ -99,9 +100,11 @@ export default function Team() {
               key={member.name}
               className="flex flex-col items-center rounded-lg bg-gray-50 p-4 shadow"
             >
-              <img
+              <Image
                 src={member.img}
                 alt={member.name}
+                width={96}
+                height={96}
                 className="mb-3 h-24 w-24 rounded-full border-4 border-blue-200 object-cover"
               />
               <div className="font-bold text-blue-900">{member.name}</div>
