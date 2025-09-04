@@ -5,7 +5,7 @@ export default function About() {
     <section className="bg-gray-50 py-16" id="quienes-somos">
       <div className="container mx-auto max-w-3xl text-center">
         <h2 className="mb-2 text-3xl font-bold">¿Quiénes Somos?</h2>
-        <h3 className="mb-4 text-xl font-semibold">Bienvenidos a Ciadet!</h3>
+        <h3 className="mb-4 text-xl font-semibold">Bienvenidos a Encode!</h3>
         <p className="mb-6">
           Somos un centro de investigación y desarrollo tecnológico comprometido
           con la innovación y la excelencia.
