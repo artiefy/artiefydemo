@@ -1,4 +1,4 @@
-'use client';
+// Este componente ha sido eliminado y ya no se usa en la página principal.
 import Image from 'next/image';
 
 export default function Projects() {
