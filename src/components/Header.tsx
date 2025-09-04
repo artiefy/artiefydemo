@@ -169,7 +169,7 @@ export default function Header() {
                 type="button"
                 onClick={() => {
                   setShowQuienesMenu((prev) => !prev); // toggle igual que ofertas
-                  setShowOfertaMenu(false); // cerrar el otro menú
+                  setShowOfertaMenu(false);
                 }}
                 className="flex items-center border-none bg-transparent p-0 text-lg font-bold text-black underline-offset-4 transition hover:text-blue-700 hover:underline"
                 style={{
