@@ -50,12 +50,12 @@ export default function HeroCarousel() {
           <div className="pointer-events-none absolute top-0 bottom-0 z-20 flex w-full items-center justify-center">
             <LayoutGroup>
               <motion.p
-                className="flex w-full justify-center px-6 text-center text-4xl font-extrabold break-words whitespace-pre-wrap text-white drop-shadow-2xl md:px-24 md:text-6xl"
+                className="flex w-full justify-center px-6 text-center text-4xl font-extrabold break-words whitespace-pre-wrap text-white drop-shadow-[0_6px_12px_rgba(0,0,0,0.45)] md:px-24 md:text-6xl"
                 layout={true}
               >
                 <WordListSwap
                   texts={phrases}
-                  mainClassName="text-white px-4 sm:px-8 md:px-12 overflow-hidden py-2 sm:py-3 md:py-4 justify-center rounded-lg whitespace-pre-wrap break-words w-full text-center drop-shadow-2xl"
+                  mainClassName="text-white px-4 sm:px-8 md:px-12 overflow-hidden py-2 sm:py-3 md:py-4 justify-center rounded-lg whitespace-pre-wrap break-words w-full text-center drop-shadow-[0_6px_12px_rgba(0,0,0,0.45)]"
                   staggerFrom={'last'}
                   initial={{ y: '100%' }}
                   animate={{ y: 0 }}
