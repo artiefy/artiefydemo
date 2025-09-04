@@ -1,21 +1,19 @@
-import Header from "../components/Header";
-import HeroCarousel from "../components/HeroCarousel";
-import ProgramList from "../components/ProgramList";
-import Stats from "../components/Stats";
-import About from "../components/About";
-import Projects from "../components/Projects";
-import StudentZone from "../components/StudentZone";
-import BlogSection from "../components/BlogSection";
-import Footer from "../components/Footer";
+import BlogSection from '../components/BlogSection';
+import Footer from '../components/Footer';
+import Header from '../components/Header';
+import HeroCarousel from '../components/HeroCarousel';
+import ProgramCategories from '../components/ProgramCategories';
+import Projects from '../components/Projects';
+import Stats from '../components/Stats';
+import StudentZone from '../components/StudentZone';
 
 export default function Home() {
   return (
     <>
       <Header />
       <HeroCarousel />
-      <ProgramList />
+      <ProgramCategories />
       <Stats />
-      <About />
       <Projects />
       <StudentZone />
       <BlogSection />

@@ -25,6 +25,42 @@ export default function About() {
           Ver más
         </a>
       </div>
+      <div className="container mx-auto mt-8 max-w-3xl space-y-4 text-left">
+        <h3 className="mb-4 text-xl font-semibold">Información de Contacto</h3>
+        <div>
+          <h4 className="text-lg font-bold">Ubicación</h4>
+          <ul className="ml-6 list-disc">
+            <li>Sede 1: calle 13 # 6-121 Jamundí</li>
+            <li>
+              Sede 2: Institución educativa Colegio España carrera 14 No. 12-11
+            </li>
+            <li>
+              Punto de información universitario: Local 64 Centro Comercial Caña
+              Dulce – Jamundí (carrera 10 entre calles 12 y 13)
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h4 className="text-lg font-bold">Correos institucionales</h4>
+          <ul className="ml-6 list-disc">
+            <li>ccoet0508@hotmail.com</li>
+            <li>rectoria.ccoet@gmail.com</li>
+            <li>Secretaria.ccoet@gmail.com</li>
+            <li>Coordinaciónacademica.ccoet@gmail.com</li>
+          </ul>
+        </div>
+        <div>
+          <h4 className="text-lg font-bold">Teléfonos de contacto</h4>
+          <p>3154304204 - 3187571157</p>
+          <h4 className="mt-2 text-lg font-bold">WhatsApp</h4>
+          <p>3154304204 - 3187571157</p>
+        </div>
+        <div>
+          <h4 className="text-lg font-bold">Horarios de atención</h4>
+          <p>Semana: 08:00 a.m a 6:00 p.m</p>
+          <p>Sábado: 08:00 a.m a 4:00 p.m</p>
+        </div>
+      </div>
     </section>
   );
 }
