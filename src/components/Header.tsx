@@ -105,7 +105,7 @@ export default function Header() {
                 type="button"
                 onClick={() => {
                   setShowOfertaMenu((prev) => !prev);
-                  setShowQuienesMenu(false); // cerrar el otro menú
+                  setShowQuienesMenu(false);
                 }}
                 className="flex items-center border-none bg-transparent p-0 text-lg font-bold text-black underline-offset-4 transition hover:text-blue-700 hover:underline"
                 style={{
