@@ -5,6 +5,8 @@ import Link from 'next/link';
 
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 
+import type { Route } from 'next';
+
 import '~/styles/login.css';
 import '~/styles/pattern.css';
 
@@ -18,9 +20,19 @@ const ofertaMenu = [
   { name: 'Doctorados', icon: '🧑‍🔬', slug: 'doctorados' },
 ];
 
+const quienesMenu = [
+  { name: 'Contratos', slug: 'contratos', icon: '📄' },
+  { name: 'Convenios', slug: 'convenios', icon: '🤝' },
+];
+
 export default function Header() {
   const [showOfertaMenu, setShowOfertaMenu] = useState(false);
+  const [showQuienesMenu, setShowQuienesMenu] = useState(false);
   const ofertaMenuRef = useRef<HTMLDivElement>(null);
+
+  // Nuevo estado para mostrar/ocultar el header
+  const [showHeader, setShowHeader] = useState(true);
+  const lastScrollY = useRef(0);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -29,27 +41,57 @@ export default function Header() {
         !ofertaMenuRef.current.contains(event.target as Node)
       ) {
         setShowOfertaMenu(false);
+        setShowQuienesMenu(false);
       }
     }
-    if (showOfertaMenu) {
+    if (showOfertaMenu || showQuienesMenu) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showOfertaMenu]);
+  }, [showOfertaMenu, showQuienesMenu]);
+
+  // Detecta dirección del scroll para mostrar/ocultar el header
+  useEffect(() => {
+    function onScroll() {
+      const currentY = window.scrollY;
+      if (currentY < 40) {
+        setShowHeader(true);
+      } else if (currentY > lastScrollY.current) {
+        setShowHeader(false); // scroll abajo, ocultar
+      } else {
+        setShowHeader(true); // scroll arriba, mostrar
+      }
+      lastScrollY.current = currentY;
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   return (
-    <header className="pattern-header-bg sticky top-0 z-50 shadow">
+    <header
+      className={`pattern-header-bg sticky top-0 z-50 shadow transition-transform duration-300 ${
+        showHeader ? 'translate-y-0' : '-translate-y-full'
+      } bg-white`}
+    >
       <nav className="container mx-auto flex min-h-[120px] items-center justify-between px-6 py-8">
-        <div className="rounded-lg bg-blue-100 px-4 py-2 text-3xl font-extrabold tracking-wide text-blue-700 shadow-md">
-          CCOET
+        <div className="flex items-center rounded-lg bg-blue-100 px-6 py-3 shadow-lg">
+          <span
+            className="font-serif text-5xl font-extrabold tracking-wide text-blue-700 drop-shadow-lg md:text-6xl lg:text-7xl"
+            style={{
+              letterSpacing: '0.04em',
+              textShadow: '0 2px 16px rgba(37,99,235,0.18), 0 1px 0 #fff',
+            }}
+          >
+            CCOET
+          </span>
         </div>
-        <ul className="flex gap-6 font-medium text-gray-700">
+        <ul className="flex gap-6 text-lg font-bold text-black">
           <li>
             <Link
               href="#"
-              className="font-semibold underline-offset-4 transition hover:text-blue-700 hover:underline"
+              className="text-lg font-bold text-black underline-offset-4 transition hover:text-blue-700 hover:underline"
             >
               Inicio
             </Link>
@@ -58,8 +100,11 @@ export default function Header() {
             <div ref={ofertaMenuRef} className="inline-block">
               <button
                 type="button"
-                onClick={() => setShowOfertaMenu((prev) => !prev)}
-                className="flex items-center border-none bg-transparent p-0 font-semibold underline-offset-4 transition hover:text-blue-700 hover:underline"
+                onClick={() => {
+                  setShowOfertaMenu((prev) => !prev);
+                  setShowQuienesMenu(false); // cerrar el otro menú
+                }}
+                className="flex items-center border-none bg-transparent p-0 text-lg font-bold text-black underline-offset-4 transition hover:text-blue-700 hover:underline"
                 style={{
                   background: 'none',
                   border: 'none',
@@ -115,18 +160,75 @@ export default function Header() {
               )}
             </div>
           </li>
-          <li>
-            <Link
-              href="/about"
-              className="font-semibold underline-offset-4 transition hover:text-blue-700 hover:underline"
-            >
-              ¿ Quienes Somos ?
-            </Link>
+          <li className="relative">
+            <div className="inline-block">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQuienesMenu((prev) => !prev); // toggle igual que ofertas
+                  setShowOfertaMenu(false); // cerrar el otro menú
+                }}
+                className="flex items-center border-none bg-transparent p-0 text-lg font-bold text-black underline-offset-4 transition hover:text-blue-700 hover:underline"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                ¿ Quienes Somos ?
+                <span className="ml-2">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <rect
+                      x="4"
+                      y="7"
+                      width="16"
+                      height="2"
+                      rx="1"
+                      fill="#2563eb"
+                    />
+                    <rect
+                      x="4"
+                      y="11"
+                      width="16"
+                      height="2"
+                      rx="1"
+                      fill="#2563eb"
+                    />
+                    <rect
+                      x="4"
+                      y="15"
+                      width="16"
+                      height="2"
+                      rx="1"
+                      fill="#2563eb"
+                    />
+                  </svg>
+                </span>
+              </button>
+              {/* Submenú para quienes somos */}
+              {showQuienesMenu && (
+                <div className="absolute top-full left-0 z-50 mt-2 w-56 rounded-xl border border-blue-100 bg-white shadow-lg">
+                  <ul className="py-2">
+                    {quienesMenu.map((item) => (
+                      <li key={item.slug}>
+                        <Link
+                          href={`/quienes/${item.slug}` as Route}
+                          className="flex items-center px-4 py-2 font-semibold text-blue-900 transition hover:bg-blue-50 hover:text-blue-700"
+                        >
+                          <span className="mr-2 text-xl">{item.icon}</span>
+                          <span>{item.name}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </li>
           <li>
             <Link
               href="#estudiantes"
-              className="font-semibold underline-offset-4 transition hover:text-blue-700 hover:underline"
+              className="text-lg font-bold text-black underline-offset-4 transition hover:text-blue-700 hover:underline"
             >
               Estudiantes
             </Link>
@@ -134,7 +236,7 @@ export default function Header() {
           <li>
             <Link
               href="#sedes"
-              className="font-semibold underline-offset-4 transition hover:text-blue-700 hover:underline"
+              className="text-lg font-bold text-black underline-offset-4 transition hover:text-blue-700 hover:underline"
             >
               Sedes
             </Link>
