@@ -29,6 +29,7 @@ export default function Header() {
   const [showOfertaMenu, setShowOfertaMenu] = useState(false);
   const [showQuienesMenu, setShowQuienesMenu] = useState(false);
   const ofertaMenuRef = useRef<HTMLDivElement>(null);
+  const quienesMenuRef = useRef<HTMLDivElement>(null);
 
   // Nuevo estado para mostrar/ocultar el header
   const [showHeader, setShowHeader] = useState(true);
@@ -38,7 +39,9 @@ export default function Header() {
     function handleClickOutside(event: MouseEvent) {
       if (
         ofertaMenuRef.current &&
-        !ofertaMenuRef.current.contains(event.target as Node)
+        !ofertaMenuRef.current.contains(event.target as Node) &&
+        quienesMenuRef.current &&
+        !quienesMenuRef.current.contains(event.target as Node)
       ) {
         setShowOfertaMenu(false);
         setShowQuienesMenu(false);
@@ -91,7 +94,7 @@ export default function Header() {
           <li>
             <Link
               href="#"
-              className="text-lg font-bold text-black underline-offset-4 transition hover:text-blue-700 hover:underline"
+              className="text-lg font-bold text-blue-700 underline underline-offset-4 transition hover:text-blue-700 focus:text-blue-700"
             >
               Inicio
             </Link>
@@ -161,7 +164,7 @@ export default function Header() {
             </div>
           </li>
           <li className="relative">
-            <div className="inline-block">
+            <div className="inline-block" ref={quienesMenuRef}>
               <button
                 type="button"
                 onClick={() => {
