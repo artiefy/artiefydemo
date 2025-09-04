@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 
+import Image from 'next/image';
+
 import { motion, useAnimation } from 'framer-motion';
 
 const noticias = [
@@ -9,21 +11,21 @@ const noticias = [
     resumen:
       'Descubre cómo la formación permanente impulsa el crecimiento profesional y personal.',
     fecha: '2024-06-01',
-    portada: '', // Aquí puedes poner la ruta de la imagen de portada en el futuro
+    portada: '/teacher.jpg',
   },
   {
     titulo: 'Innovación educativa: tendencias 2024',
     resumen:
       'Explora las nuevas tecnologías y metodologías que están transformando el aprendizaje.',
     fecha: '2024-05-20',
-    portada: '',
+    portada: '/teacher2.jpg',
   },
   {
     titulo: 'Educación virtual: ventajas y desafíos',
     resumen:
       'Analizamos los beneficios y retos de estudiar en plataformas digitales.',
     fecha: '2024-05-10',
-    portada: '',
+    portada: '/teacher3.jpg',
   },
 ];
 
@@ -87,8 +89,15 @@ export default function BlogSection() {
               style={{ minHeight: 300 }}
             >
               {/* Espacio para imagen de portada */}
-              <div className="flex h-48 w-full items-center justify-center bg-blue-50">
-                {/* <img src={noticia.portada} alt="Portada" className="h-full w-full object-cover" /> */}
+              <div className="flex h-64 w-full items-center justify-center bg-blue-50">
+                <Image
+                  src={noticia.portada}
+                  alt={`Portada de ${noticia.titulo}`}
+                  width={400}
+                  height={256}
+                  className="h-full w-full object-cover"
+                  priority={idx === 0}
+                />
               </div>
               <div className="flex w-full flex-col items-center p-6">
                 <button

@@ -123,18 +123,40 @@ export default function HeroCarousel() {
           .swiper-button-next,
           .swiper-button-prev {
             color: #fff;
-            width: 48px;
-            height: 48px;
-            background: rgba(37, 99, 235, 0.5);
-            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            background: none !important;
+            border-radius: 0 !important;
             top: 50%;
             transform: translateY(-50%);
             z-index: 40;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
           }
           .swiper-button-next:after,
           .swiper-button-prev:after {
-            font-size: 24px;
-            font-weight: bold;
+            content: '';
+            display: block;
+            width: 64px;
+            height: 64px;
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: contain;
+            transition: filter 0.2s;
+          }
+          .swiper-button-next:after {
+            background-image: url("data:image/svg+xml,%3Csvg width='64' height='64' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8.91016 19.9201L15.4302 13.4001C16.2002 12.6301 16.2002 11.3701 15.4302 10.6001L8.91016 4.08008' stroke='%23fff' stroke-width='1.5' stroke-miterlimit='10' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            transform: rotate(0deg);
+          }
+          .swiper-button-prev:after {
+            background-image: url("data:image/svg+xml,%3Csvg width='64' height='64' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8.91016 19.9201L15.4302 13.4001C16.2002 12.6301 16.2002 11.3701 15.4302 10.6001L8.91016 4.08008' stroke='%23fff' stroke-width='1.5' stroke-miterlimit='10' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            transform: rotate(180deg);
+          }
+          .swiper-button-next:hover:after,
+          .swiper-button-prev:hover:after {
+            background-image: url("data:image/svg+xml,%3Csvg width='64' height='64' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8.91016 19.9201L15.4302 13.4001C16.2002 12.6301 16.2002 11.3701 15.4302 10.6001L8.91016 4.08008' stroke='%23bdbdbd' stroke-width='1.5' stroke-miterlimit='10' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
           }
         `}</style>
       </div>
