@@ -68,7 +68,7 @@ export default function QuienesSomosSection() {
               transition: { duration: 0.8, ease: 'easeOut' },
             },
           }}
-          className="flex w-full flex-col items-center justify-center text-center md:ml-8 md:w-2/3 md:items-start md:pl-8 md:text-left"
+          className="flex w-full flex-col items-center justify-center text-center md:ml-12 md:w-2/3 md:items-start md:pr-16 md:pl-8 md:text-left"
         >
           <h2 className="mb-4 text-3xl font-bold text-blue-900">
             ¿Quiénes Somos?
