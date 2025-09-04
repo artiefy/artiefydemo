@@ -32,6 +32,7 @@ export default [
 			'src/components/educadores/ui/**',
 			'src/components/admin/ui/**',
 			'src/components/super-admin/ui/**',
+			'src/components/ui/CountUp.tsx'
 		],
 	},
 
