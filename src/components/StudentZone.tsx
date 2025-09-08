@@ -71,7 +71,7 @@ export default function StudentZone() {
             <span className="text-black">ZONA</span>{' '}
             <span className="text-blue-700">ESTUDIANTES</span>
           </h2>
-          <p className="mx-auto mb-6 max-w-4xl text-lg">
+          <p className="mx-auto mb-6 max-w-4xl text-lg text-black">
             Accede a nuestra plataforma educativa virtual para consultar tus
             programas, materiales y grabaciones de clase. En CCOET, apostamos
             por la tecnología para potenciar tu aprendizaje y experiencia

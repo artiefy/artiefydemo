@@ -74,13 +74,12 @@ export default function QuienesSomosSection() {
             ¿Quiénes Somos?
           </h2>
           <p className="mb-6 text-lg text-gray-700">
-            En Ciadet, impulsamos el desarrollo tecnológico y la investigación
-            aplicada para transformar la educación y la sociedad. Nuestro equipo
-            multidisciplinario trabaja en la creación de soluciones innovadoras
-            en ciencia, tecnología, software y biomédica, con un enfoque en la
-            inteligencia artificial y el impacto social. Creemos en el poder de
-            la colaboración y la creatividad para convertir ideas en proyectos
-            que generan valor y progreso.
+            En CCOET, nos dedicamos a brindar educación de calidad y
+            oportunidades de desarrollo profesional para todos. Nuestro equipo
+            está comprometido con la innovación, el aprendizaje continuo y el
+            acompañamiento de nuestros estudiantes en cada etapa de su
+            formación. Creemos en el poder de la educación para transformar
+            vidas y construir un mejor futuro.
           </p>
           <Link
             href="/about"
