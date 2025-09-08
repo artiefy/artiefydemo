@@ -1,3 +1,6 @@
+import { withNextVideo } from 'next-video/process';
+
+import withPlaiceholder from '@plaiceholder/next';
 import { createJiti } from 'jiti';
 import { fileURLToPath } from 'node:url';
 
@@ -9,6 +12,7 @@ jiti('./src/env.ts');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  typedRoutes: true,
   images: {
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',
@@ -17,10 +21,14 @@ const nextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     minimumCacheTTL: 60,
     remotePatterns: [
-      new URL('https://s3.us-east-2.amazonaws.com/artiefy-upload/**'),
-      new URL('https://placehold.co/**'),
-      new URL('https://img.clerk.com/**'),
-      new URL('https://assets.example.com/**'),
+      {
+        protocol: 'https',
+        hostname: 's3.us-east-2.amazonaws.com',
+        pathname: '/artiefy-upload/**',
+      },
+      { protocol: 'https', hostname: 'placehold.co', pathname: '/**' },
+      { protocol: 'https', hostname: 'img.clerk.com', pathname: '/**' },
+      { protocol: 'https', hostname: 'assets.example.com', pathname: '/**' },
     ],
   },
   turbopack: {
@@ -49,7 +57,6 @@ const nextConfig = {
     },
   },
   expireTime: 3600,
-  typedRoutes: true, // Now stable!
 };
 
-export default nextConfig;
+export default withNextVideo(withPlaiceholder(nextConfig));

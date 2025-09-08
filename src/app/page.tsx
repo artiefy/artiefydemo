@@ -1,6 +1,5 @@
-import BlogSection from '../components/BlogSection';
 import Footer from '../components/Footer';
-import Header from '../components/Header';
+import Header from '../components/Header1';
 import HeroCarousel from '../components/HeroCarousel';
 import ProgramCategories from '../components/ProgramCategories';
 import QuienesSomosSection from '../components/QuienesSomosSection';
@@ -16,7 +15,6 @@ export default function Home() {
       <Stats />
       <QuienesSomosSection />
       <StudentZone />
-      <BlogSection />
       <Footer />
     </>
   );

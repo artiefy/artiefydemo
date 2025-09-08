@@ -4,9 +4,16 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { gsap } from 'gsap';
 import { InertiaPlugin } from 'gsap/InertiaPlugin';
 
-import { safeColor } from '../../types'; // <-- Import safeColor
-
 gsap.registerPlugin(InertiaPlugin);
+
+// Utility function to ensure valid color strings
+const safeColor = (
+  color: string | undefined | null,
+  fallback: string
+): string => {
+  if (!color || typeof color !== 'string') return fallback;
+  return color;
+};
 
 const throttle = (func: (...args: unknown[]) => void, limit: number) => {
   let lastCall = 0;
@@ -45,12 +52,12 @@ export interface DotGridProps {
 }
 
 function hexToRgb(hex: string) {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
-  if (!m) return { r: 0, g: 0, b: 0 };
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+  if (!result) return { r: 0, g: 0, b: 0 };
   return {
-    r: parseInt(m[1]!, 16),
-    g: parseInt(m[2]!, 16),
-    b: parseInt(m[3]!, 16),
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16),
   };
 }
 
@@ -71,9 +78,9 @@ const DotGrid: React.FC<DotGridProps> = ({
   style,
 }) => {
   // Use safeColor for all color props
-  const safeBaseColor = safeColor(baseColor ?? '#5227FF', '#5227FF');
-  const safeActiveColor = safeColor(activeColor ?? '#5227FF', '#5227FF');
-  const safeDotColor = safeColor(dotColor ?? '#332F2F', '#332F2F');
+  const safeBaseColor = safeColor(baseColor, '#5227FF');
+  const safeActiveColor = safeColor(activeColor, '#5227FF');
+  const safeDotColor = safeColor(dotColor, '#332F2F');
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);

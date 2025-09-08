@@ -11,27 +11,21 @@ import type { Route } from 'next';
 
 const categories = [
   {
-    name: 'Diplomados y Cursos',
-    slug: 'diplomados-cursos',
-    color: 'bg-blue-100',
+    title: 'Diplomados y Cursos',
+    description: 'Programas especializados para el desarrollo profesional',
     icon: '📚',
+    color: 'from-blue-400/60 to-blue-600/60', // fondo azulado transparente
+    programs: ['Administración', 'Marketing Digital', 'Recursos Humanos'],
+    href: '/estudiantes#cursos-list-section', // Redirige a la zona de cursos lista
   },
   {
-    name: 'Carreras técnicas',
-    slug: 'carreras-tecnicas',
-    color: 'bg-green-100',
+    title: 'Carreras técnicas',
+    description: 'Formación técnica especializada para el mercado laboral',
     icon: '🛠️',
+    color: 'from-cyan-400/60 to-blue-500/60', // fondo azulado transparente
+    programs: ['Sistemas', 'Mecánica', 'Electrónica'],
+    href: '/estudiantes#diplomados-section', // Redirige a la zona de programas
   },
-  {
-    name: 'Tecnologías',
-    slug: 'tecnologias',
-    color: 'bg-yellow-100',
-    icon: '💡',
-  },
-  { name: 'Pregrados', slug: 'pregrados', color: 'bg-purple-100', icon: '🎓' },
-  { name: 'Posgrados', slug: 'posgrados', color: 'bg-pink-100', icon: '🏅' },
-  { name: 'Maestrías', slug: 'maestrias', color: 'bg-indigo-100', icon: '📖' },
-  { name: 'Doctorados', slug: 'doctorados', color: 'bg-red-100', icon: '🧑‍🔬' },
 ];
 
 export default function ProgramCategories() {
@@ -80,94 +74,27 @@ export default function ProgramCategories() {
         </p>
         <div className="flex w-full flex-col items-center gap-8">
           <div className="flex w-full flex-wrap justify-center gap-10 md:gap-14 lg:gap-16 xl:gap-20 2xl:gap-24">
-            {categories.slice(0, 3).map((cat, i) => (
+            {categories.slice(0, 2).map((cat, _i) => (
               <motion.div
-                key={cat.slug}
-                initial={{ opacity: 0, scale: 0.7 }}
-                animate={controls}
-                variants={{
-                  hidden: { opacity: 0, scale: 0.7 },
-                  visible: {
-                    opacity: 1,
-                    scale: 1,
-                    transition: {
-                      duration: 0.7,
-                      ease: 'easeOut',
-                      delay: Math.random() * 0.6 + i * 0.1,
-                    },
-                  },
-                }}
+                key={cat.title}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2 }} // amount más bajo para que aparezcan antes
+                transition={{ duration: 0.4, ease: 'easeOut' }} // duración más corta
               >
                 <Link
-                  href={`/oferta/${cat.slug}` as Route}
+                  href={cat.href as Route}
                   className={`flex w-64 transform flex-col items-center justify-center rounded-xl p-5 shadow-lg transition-all duration-300 hover:scale-105 ${cat.color} text-blue-900 hover:text-blue-800`}
                 >
-                  <span className="mb-2 text-4xl">{cat.icon}</span>
-                  <span className="text-lg font-bold">{cat.name}</span>
+                  <div
+                    className={`relative flex flex-col items-center rounded-2xl bg-blue-100/70 p-8 shadow-lg backdrop-blur-md transition-transform duration-300 hover:scale-105 ${cat.color}`}
+                  >
+                    <span className="mb-2 text-4xl">{cat.icon}</span>
+                    <span className="text-lg font-bold">{cat.title}</span>
+                  </div>
                 </Link>
               </motion.div>
             ))}
-          </div>
-          <div className="flex w-full flex-wrap justify-center gap-10 md:gap-14 lg:gap-16 xl:gap-20 2xl:gap-24">
-            {categories.slice(3, 6).map((cat, i) => (
-              <motion.div
-                key={cat.slug}
-                initial={{ opacity: 0, scale: 0.7 }}
-                animate={controls}
-                variants={{
-                  hidden: { opacity: 0, scale: 0.7 },
-                  visible: {
-                    opacity: 1,
-                    scale: 1,
-                    transition: {
-                      duration: 0.7,
-                      ease: 'easeOut',
-                      delay: Math.random() * 0.6 + i * 0.1,
-                    },
-                  },
-                }}
-              >
-                <Link
-                  href={`/oferta/${cat.slug}` as Route}
-                  className={`flex w-64 transform flex-col items-center justify-center rounded-xl p-5 shadow-lg transition-all duration-300 hover:scale-105 ${cat.color} text-blue-900 hover:text-blue-800`}
-                >
-                  <span className="mb-2 text-4xl">{cat.icon}</span>
-                  <span className="text-lg font-bold">{cat.name}</span>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-          <div className="flex w-full justify-center gap-10 md:gap-14 lg:gap-16 xl:gap-20 2xl:gap-24">
-            {categories[6] && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.7 }}
-                animate={controls}
-                variants={{
-                  hidden: { opacity: 0, scale: 0.7 },
-                  visible: {
-                    opacity: 1,
-                    scale: 1,
-                    transition: {
-                      duration: 0.7,
-                      ease: 'easeOut',
-                      delay: Math.random() * 0.6 + 0.3,
-                    },
-                  },
-                }}
-              >
-                <Link
-                  href={`/oferta/${categories[6].slug}` as Route}
-                  className={`flex w-64 transform flex-col items-center justify-center rounded-xl p-5 shadow-lg transition-all duration-300 hover:scale-105 ${categories[6].color ?? ''} text-blue-900 hover:text-blue-800`}
-                >
-                  <span className="mb-2 text-4xl">
-                    {categories[6].icon ?? ''}
-                  </span>
-                  <span className="text-lg font-bold">
-                    {categories[6].name ?? ''}
-                  </span>
-                </Link>
-              </motion.div>
-            )}
           </div>
         </div>
       </motion.div>

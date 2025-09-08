@@ -1,13 +1,17 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 
-import { SignInButton } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
+
+import { SignedIn, SignedOut, SignInButton, useAuth } from '@clerk/nextjs';
 import { motion, useAnimation } from 'framer-motion';
 
 export default function StudentZone() {
   const controls = useAnimation();
   const ref = useRef<HTMLDivElement>(null);
   const [animated, setAnimated] = useState(false);
+  const router = useRouter();
+  const { isSignedIn } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -22,6 +26,13 @@ export default function StudentZone() {
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, [controls, animated]);
+
+  const handleIngresarClick = () => {
+    if (isSignedIn) {
+      router.push('/estudiantes');
+    }
+    // Si no está signed in, el SignInButton manejará el modal automáticamente
+  };
 
   return (
     <section
@@ -57,7 +68,8 @@ export default function StudentZone() {
       >
         <div className="flex w-full flex-col items-center justify-center text-center">
           <h2 className="mb-2 text-5xl font-extrabold">
-            ZONA <span className="text-blue-700">ESTUDIANTES</span>
+            <span className="text-black">ZONA</span>{' '}
+            <span className="text-blue-700">ESTUDIANTES</span>
           </h2>
           <p className="mx-auto mb-6 max-w-4xl text-lg">
             Accede a nuestra plataforma educativa virtual para consultar tus
@@ -65,11 +77,24 @@ export default function StudentZone() {
             por la tecnología para potenciar tu aprendizaje y experiencia
             académica.
           </p>
-          <SignInButton mode="modal">
-            <span className="inline-block cursor-pointer rounded-lg bg-blue-700 px-6 py-2 font-semibold text-white transition hover:bg-blue-800">
-              Ingresar
-            </span>
-          </SignInButton>
+
+          {/* Mostrar diferentes botones según el estado de autenticación */}
+          <SignedOut>
+            <SignInButton mode="modal">
+              <span className="inline-block cursor-pointer rounded-lg bg-blue-700 px-6 py-2 font-semibold text-white transition hover:bg-blue-800">
+                Ingresar
+              </span>
+            </SignInButton>
+          </SignedOut>
+
+          <SignedIn>
+            <button
+              onClick={handleIngresarClick}
+              className="inline-block cursor-pointer rounded-lg bg-blue-700 px-6 py-2 font-semibold text-white transition hover:bg-blue-800"
+            >
+              Ir a Cursos
+            </button>
+          </SignedIn>
         </div>
       </motion.div>
     </section>
