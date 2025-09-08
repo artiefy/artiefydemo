@@ -559,7 +559,7 @@ export default async function StudentListCourses({
     <div id="courses-list-section">
       <div className="flex justify-center">
         <GradientText className="my-6 text-3xl sm:text-4xl md:text-5xl lg:text-6xl">
-          Cursos Artie
+          Cursos CCOET
         </GradientText>
       </div>
       <div className="relative z-0 mb-8 grid grid-cols-1 gap-4 px-8 sm:grid-cols-2 lg:grid-cols-3 lg:px-20">

@@ -38,7 +38,6 @@ export function Header({
   // New state to track if activity modal is open
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   // New state to track scroll direction
-  const [_isScrollingDown, setIsScrollingDown] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
@@ -70,10 +69,9 @@ export function Header({
 
     const handleHideHeaderTemporarily = () => {
       setIsHeaderVisible(false);
-      // Restaurar visibilidad después del scroll
       setTimeout(() => {
         setIsHeaderVisible(true);
-      }, 2000);
+      }, 1200);
     };
 
     window.addEventListener('activity-modal-open', handleModalOpen);
@@ -100,7 +98,6 @@ export function Header({
 
       // Determine scroll direction
       const isDown = currentScrollY > lastScrollY;
-      setIsScrollingDown(isDown);
 
       // Show header if scrolling down, hide if scrolling up
       if (currentScrollY > 100) {
