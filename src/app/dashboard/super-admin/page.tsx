@@ -3,7 +3,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
+import { useUser } from '@clerk/nextjs';
 import {
   Check,
   Edit,
@@ -123,6 +125,15 @@ interface WhatsAppTemplate {
 }
 
 export default function AdminDashboard() {
+  const { user, isLoaded } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoaded && user && user.publicMetadata?.role !== 'super-admin') {
+      router.replace('/');
+    }
+  }, [user, isLoaded, router]);
+
   const [users, setUsers] = useState<User[]>([]);
   // 🔍 Estados de búsqueda y filtros
   const [searchQuery, setSearchQuery] = useState(''); // Búsqueda por nombre o correo
@@ -1040,8 +1051,8 @@ export default function AdminDashboard() {
 
       const validUserData: ViewUserResponse = {
         id: String(userData.id),
-        firstName: firstName || 'Nombre no disponible',
-        lastName: lastName || 'Apellido no disponible',
+        firstName: firstName ?? 'Nombre no disponible',
+        lastName: lastName ?? 'Apellido no disponible',
         email: String(userData.email),
         profileImage: userData.profileImage ?? '/default-avatar.png',
         createdAt: userData.createdAt ?? 'Fecha no disponible',
