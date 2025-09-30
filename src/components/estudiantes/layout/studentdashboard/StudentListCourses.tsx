@@ -99,7 +99,7 @@ export default async function StudentListCourses({
     courses.map(async (course) => {
       // Handle image URL and blur data
       let imageUrl =
-        'https://placehold.co/600x400/01142B/3AF4EF?text=Artiefy&font=MONTSERRAT';
+        'https://placehold.co/600x400/01142B/3AF4EF?text=CCOET&font=MONTSERRAT';
       let blurDataURL: string | undefined = undefined;
       try {
         if (course.coverImageKey && course.coverImageKey !== 'NULL') {

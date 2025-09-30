@@ -33,7 +33,7 @@ export default function Home() {
   }, [user, router]);
 
   return (
-    <>
+    <div className="overflow-x-hidden">
       <Header />
       <HeroCarousel />
       <ProgramCategories />
@@ -41,6 +41,6 @@ export default function Home() {
       <QuienesSomosSection />
       <StudentZone />
       <Footer />
-    </>
+    </div>
   );
 }

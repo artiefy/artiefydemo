@@ -563,9 +563,7 @@ export default function AdminDashboard() {
 
   const fetchPrograms = useCallback(async () => {
     try {
-      const res = await fetch(
-        'server/actions/estudiantes/programs/getAllPrograms'
-      ); // Actualizar la ruta correcta
+      const res = await fetch('/api/super-admin/programs'); // Cambiado a endpoint correcto
       if (!res.ok) throw new Error('Error al obtener programas');
 
       const rawData: unknown = await res.json();
@@ -577,7 +575,8 @@ export default function AdminDashboard() {
             item !== null &&
             'id' in item &&
             'title' in item &&
-            typeof (item as { id: unknown }).id === 'string' &&
+            (typeof (item as { id: unknown }).id === 'string' ||
+              typeof (item as { id: unknown }).id === 'number') &&
             typeof (item as { title: unknown }).title === 'string'
         )
       ) {

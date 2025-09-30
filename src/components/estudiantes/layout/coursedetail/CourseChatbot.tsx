@@ -132,7 +132,7 @@ const CourseChatbot: React.FC<CourseChatbotProps> = ({ isEnrolled }) => {
                   id="modal-title"
                   className="text-lg font-semibold text-gray-800"
                 >
-                  CCOET IA
+                  CCOET
                 </h2>
               </div>
               <button

@@ -21,7 +21,13 @@ export async function GET(req: NextRequest) {
           { status: 404 }
         );
       }
-      return NextResponse.json(materia);
+      // Mapear campos a camelCase si es necesario
+      const mappedMateria = {
+        ...materia,
+        courseId: materia.courseid ?? null,
+        programaId: materia.programaId ?? null,
+      };
+      return NextResponse.json(mappedMateria);
     } catch (error) {
       const errorMessage = (error as Error).message;
       return NextResponse.json(
@@ -32,7 +38,13 @@ export async function GET(req: NextRequest) {
   } else {
     try {
       const materias = await getAllMaterias();
-      return NextResponse.json(materias);
+      // Mapear todos los resultados a camelCase
+      const mappedMaterias = materias.map((m) => ({
+        ...m,
+        courseId: m.courseid ?? null,
+        programaId: m.programaId ?? null,
+      }));
+      return NextResponse.json(mappedMaterias);
     } catch (error) {
       const errorMessage = (error as Error).message;
       return NextResponse.json(

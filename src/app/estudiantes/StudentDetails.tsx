@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { StarIcon } from '@heroicons/react/24/solid';
 
@@ -99,30 +100,36 @@ export default function StudentDetails({
     // setShowChatbot(false); // Comentado para evitar cierre automático
   }, []);
 
+  // Router and pathname para comportamiento de búsqueda (igual a StudentCategories)
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Sync input with URL query param
+  useEffect(() => {
+    const q = searchParams?.get('query') ?? '';
+    setSearchQuery(q);
+  }, [searchParams]);
+
   const handleSearch = useCallback(
     (e?: React.FormEvent) => {
       e?.preventDefault();
 
-      if (!searchQuery.trim() || searchInProgress) return;
-
-      console.log('🔍 Iniciando búsqueda:', searchQuery.trim());
+      const query = searchQuery.trim();
+      if (!query || searchInProgress) return;
 
       setSearchInProgress(true);
       setSearchBarDisabled(true);
 
-      // Emit global search event
-      const searchEvent = new CustomEvent('artiefy-search', {
-        detail: { query: searchQuery.trim() },
-      });
-      console.log('📤 Disparando evento artiefy-search');
-      window.dispatchEvent(searchEvent);
+      const params = new URLSearchParams();
+      params.set('query', query);
+      router.push(`${pathname}?${params.toString()}`);
 
-      // Clear the search input
       setSearchQuery('');
       setSearchInProgress(false);
       setSearchBarDisabled(false);
     },
-    [searchQuery, searchInProgress]
+    [searchQuery, searchInProgress, router, pathname]
   );
 
   // Add event listener in useEffect
@@ -311,13 +318,22 @@ export default function StudentDetails({
                       searchBarDisabled ? 'cursor-not-allowed opacity-70' : ''
                     }`}
                     name="search"
+                    data-role="header-search"
                     placeholder={
                       searchBarDisabled ? 'Procesando consulta...' : _text
                     }
                     type="search"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setSearchQuery(v);
+                      // si se borra el input, quitar ?query para mostrar todos los cursos
+                      if (v === '' && searchParams?.has('query')) {
+                        router.push(pathname);
+                      }
+                    }}
                     disabled={searchBarDisabled}
+                    data-no-chatbot="true" /* evitar handlers globales que abran chatbot */
                   />
                   <svg
                     viewBox="0 0 24 24"
@@ -594,6 +610,7 @@ export default function StudentDetails({
           </div>
         </div>
       </main>
+
       <StudentChatbot
         isAlwaysVisible={true}
         showChat={showChatbot}

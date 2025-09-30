@@ -129,16 +129,16 @@ export default async function RootLayout({
           {/* Microformatos para información de contacto */}
           <div className="h-card" style={{ display: 'none' }}>
             <a className="p-name u-url" href="https://artiefy.com">
-              Artiefy
+              CCOET
             </a>
-            <span className="p-org">Artiefy Educación</span>
+            <span className="p-org">CCOET Educación</span>
             <a className="u-email" href="mailto:artiefy4@gmail.com">
               artiefy4@gmail.com
             </a>
             <img
               className="u-photo"
-              src="https://artiefy.com/artiefy-icon.png"
-              alt="Logo de Artiefy"
+              src="https://CCOET.com/CCOET-icon.png"
+              alt="Logo de CCOET"
             />
           </div>
           <Providers>
@@ -147,6 +147,86 @@ export default async function RootLayout({
             <NotificationSubscription />
           </Providers>
           <Toaster />
+
+          {/* Script: sincroniza ?query con las barras de búsqueda (header, studentdetail, studentcategories) */}
+          <Script id="sync-search" strategy="afterInteractive">
+            {`
+(function(){
+  function matchesSelector(el){
+    return el && el.matches && (
+      el.matches('input.header-input') ||
+      el.matches('input[data-no-chatbot]') ||
+      el.matches('input[name="search"]') ||
+      el.matches('input[data-role="course-search"]') ||
+      el.matches('input[data-role="header-search"]')
+    );
+  }
+
+  function syncFromUrl(){
+    try {
+      var q = new URLSearchParams(window.location.search).get('query') || '';
+      var els = document.querySelectorAll('input.header-input, input[data-no-chatbot], input[name="search"], input[data-role="course-search"], input[data-role="header-search"]');
+      els.forEach(function(el){
+        try { if (el.value !== q) el.value = q; } catch(e){}
+      });
+    } catch(e) { console.error('sync-search error', e); }
+  }
+
+  // inicial
+  syncFromUrl();
+
+  // popstate (back/forward)
+  window.addEventListener('popstate', syncFromUrl);
+
+  // next/router client navigations may not emit popstate — detectar cambios en location.search por polling
+  var lastSearch = location.search;
+  setInterval(function(){
+    if(location.search !== lastSearch){
+      lastSearch = location.search;
+      syncFromUrl();
+    }
+  }, 300);
+
+  // si el usuario borra el input (typing, clear button x, change, search), borrar en todos los inputs y recargar /estudiantes si corresponde
+  function handlePotentialClear(t){
+    try {
+      if (!t) return;
+      if (!matchesSelector(t)) return;
+      var v = t.value || '';
+      if (v === '' && new URLSearchParams(location.search).has('query')) {
+        // Borrar el texto en todos los inputs sincronizados
+        var els = document.querySelectorAll('input.header-input, input[data-no-chatbot], input[name="search"], input[data-role="course-search"], input[data-role="header-search"]');
+        els.forEach(function(el){
+          try { el.value = ''; } catch(e){}
+        });
+        // Si estamos en la sección de estudiantes, recargar en /estudiantes
+        if (location.pathname && location.pathname.startsWith('/estudiantes')) {
+          window.location.href = '/estudiantes';
+          return;
+        }
+        // En otras rutas solo quitar el query sin recargar
+        history.replaceState(null, '', location.pathname);
+        lastSearch = location.search;
+        syncFromUrl();
+      }
+    } catch(e){ console.error('handlePotentialClear error', e); }
+  }
+
+  document.addEventListener('input', function(e){
+    handlePotentialClear(e.target);
+  }, {passive:true, capture:true});
+
+  document.addEventListener('search', function(e){
+    handlePotentialClear(e.target);
+  }, {passive:true, capture:true});
+
+  document.addEventListener('change', function(e){
+    handlePotentialClear(e.target);
+  }, {passive:true, capture:true});
+
+})();
+`}
+          </Script>
         </body>
       </html>
     </ClerkProvider>

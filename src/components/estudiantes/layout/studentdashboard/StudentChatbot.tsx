@@ -1128,7 +1128,7 @@ const StudentChatbot: React.FC<StudentChatbotProps> = ({
 
                   <div className="-ml-6 flex flex-1 flex-col items-center">
                     <h2 className="mt-1 text-lg font-semibold text-gray-800">
-                      CCOET IA
+                      CCOET
                     </h2>
                     <div className="flex items-center gap-2">
                       <em className="text-sm font-semibold text-gray-600">

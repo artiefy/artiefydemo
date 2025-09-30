@@ -1,8 +1,8 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 
-import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { useProgress } from '@bprogress/next';
@@ -43,6 +43,24 @@ export default function StudentCategories({
     searchParams?.get('query') ?? ''
   );
 
+  // Sync local searchQuery when URL changes
+  useEffect(() => {
+    setSearchQuery(searchParams?.get('query') ?? '');
+    setLoadingCategory(null);
+    setIsSearching(false);
+    stop();
+
+    // Scroll to results after search or category filter
+    if (searchParams?.has('query') || searchParams?.has('category')) {
+      setTimeout(() => {
+        const resultsSection = document.getElementById('courses-list-section');
+        if (resultsSection) {
+          resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 300);
+    }
+  }, [searchParams, stop]);
+
   // Usar SWR para el fetching y caching de datos
   const { data: categoriesData } = useSWR<CategoriesData>('/api/categories', {
     fallbackData: { allCategories, featuredCategories },
@@ -77,12 +95,8 @@ export default function StudentCategories({
     setIsSearching(false);
     stop();
 
-    // Skip the restoreScrollPosition since we're going to scroll to the results
-    // restoreScrollPosition();
-
-    // If we've completed a search or category filter, scroll to the results
+    // Scroll to results after search or category filter
     if (searchParams?.has('query') || searchParams?.has('category')) {
-      // Use setTimeout to ensure the DOM has been updated with results first
       setTimeout(() => {
         const resultsSection = document.getElementById('courses-list-section');
         if (resultsSection) {
@@ -121,13 +135,21 @@ export default function StudentCategories({
           </div>
           <div className="w-full lg:ml-auto lg:w-1/3">
             <div className="relative w-full max-w-lg">
+              {/* Agregado name="search" y data-role para que el script global detecte el clear (x) */}
               <Input
+                name="search"
+                data-role="course-search"
                 type="search"
                 placeholder="Buscar cursos..."
                 value={searchQuery}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setSearchQuery(e.target.value)
-                }
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const v = e.target.value;
+                  setSearchQuery(v);
+                  // si se borra, limpiar query de URL
+                  if (v === '' && searchParams?.has('query')) {
+                    router.push(pathname);
+                  }
+                }}
                 onKeyDown={handleKeyDown}
                 className="text-background w-full bg-white pr-10"
                 aria-label="Buscar cursos"
@@ -209,7 +231,8 @@ export default function StudentCategories({
                   ) : (
                     <>
                       <div className="mb-3 text-2xl text-blue-600">
-                        <Image
+                        {/* usar img nativa en lugar de next/image para iconos pequeños */}
+                        <img
                           src={`/${
                             index === 0
                               ? 'alembic-svgrepo-com.svg'
@@ -249,5 +272,91 @@ export default function StudentCategories({
         </div>
       </div>
     </section>
+  );
+}
+
+// Nuevo componente reutilizable para la barra de búsqueda
+export function CourseSearchBar({
+  defaultQuery = '',
+  onSearchAction,
+  className = '',
+}: {
+  defaultQuery?: string;
+  // rename to onSearchAction to indicate server action / avoid non-serializable prop warning
+  onSearchAction?: (query: string) => void;
+  className?: string;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(defaultQuery);
+  const { start } = useProgress();
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Sync with URL param
+  useEffect(() => {
+    const q = searchParams?.get('query') ?? '';
+    setQuery(q || defaultQuery);
+  }, [searchParams, defaultQuery]);
+
+  const handleSearch = useCallback(() => {
+    start();
+    setIsSearching(true);
+
+    if (onSearchAction) {
+      onSearchAction(query);
+      setIsSearching(false);
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (query) params.set('query', query);
+    router.push(`${pathname}?${params.toString()}`);
+    setIsSearching(false);
+  }, [onSearchAction, query, router, pathname, start]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+    }
+  };
+
+  return (
+    <div className={`relative w-full max-w-lg ${className}`}>
+      {/* Agregado name="search" para consistencia */}
+      <Input
+        name="search"
+        type="search"
+        placeholder="Buscar cursos..."
+        value={query}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          const v = e.target.value;
+          setQuery(v);
+          // si se borra, limpiar query de URL
+          if (v === '' && searchParams?.has('query')) {
+            router.push(pathname);
+          }
+        }}
+        onKeyDown={handleKeyDown}
+        className="text-background w-full bg-white pr-10"
+        aria-label="Buscar cursos"
+        autoComplete="off"
+        data-no-chatbot="true"
+      />
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+        {isSearching ? (
+          <Icons.spinner
+            className="text-background size-4"
+            aria-hidden="true"
+          />
+        ) : (
+          <MagnifyingGlassIcon
+            className="size-4 fill-gray-400"
+            aria-hidden="true"
+          />
+        )}
+      </div>
+    </div>
   );
 }

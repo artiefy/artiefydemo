@@ -19,7 +19,7 @@ const ofertaMenu = [
     name: 'Carreras técnicas',
     slug: 'carreras-tecnicas',
     icon: '🛠️',
-    href: '/estudiantes#diplomados-section',
+    href: '/programs',
   },
 ];
 

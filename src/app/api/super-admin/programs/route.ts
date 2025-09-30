@@ -8,6 +8,7 @@ import {
   createProgram,
   updateProgram,
 } from '~/models/super-adminModels/programModelsSuperAdmin';
+import { getAllPrograms } from '~/server/actions/superAdmin/programs';
 import { db } from '~/server/db';
 import { materias, users } from '~/server/db/schema';
 
@@ -352,10 +353,9 @@ export async function GET(req: Request) {
     const programId = searchParams.get('programId'); // Obtener el programId de los parámetros
 
     if (!programId) {
-      return NextResponse.json(
-        { error: 'El programId es obligatorio' },
-        { status: 400 }
-      );
+      // Si no hay programId, devolver todos los programas
+      const programs = await getAllPrograms();
+      return NextResponse.json(programs);
     }
 
     // Filtrar materias donde courseid sea null y pertenezcan al programa
@@ -364,9 +364,16 @@ export async function GET(req: Request) {
       .from(materias)
       .where(eq(materias.programaId, Number(programId)));
 
-    return NextResponse.json(filteredMaterias);
+    // Mapear los campos para que sean id, courseId, programaId (camelCase)
+    const mappedMaterias = filteredMaterias.map((m) => ({
+      ...m,
+      courseId: m.courseid ?? null,
+      programaId: m.programaId ?? null,
+    }));
+
+    return NextResponse.json(mappedMaterias);
   } catch (error) {
-    console.error('❌ Error fetching subjects:', error);
+    console.error('❌ Error fetching programs or subjects:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ error: errorMessage }, { status: 500 });

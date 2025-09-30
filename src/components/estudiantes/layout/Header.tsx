@@ -1,16 +1,15 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { SignedIn, SignedOut, SignInButton, useAuth } from '@clerk/nextjs';
 import { Dialog, DialogPanel } from '@headlessui/react';
 import { XMarkIcon as XMarkIconSolid } from '@heroicons/react/24/solid';
 
-import { Button } from '~/components/estudiantes/ui/button';
 import { Icons } from '~/components/estudiantes/ui/icons';
 
 import { UserButtonWrapper } from '../auth/UserButtonWrapper';
@@ -21,6 +20,8 @@ import '~/styles/barsicon.css';
 import '~/styles/searchBar.css';
 import '~/styles/headerSearchBar.css';
 import '~/styles/headerMenu.css';
+import '~/styles/login.css';
+
 
 export function Header({
   onEspaciosClickAction,
@@ -28,12 +29,12 @@ export function Header({
   onEspaciosClickAction?: () => void;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams(); // <-- existing (kept)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [searchInProgress, setSearchInProgress] = useState<boolean>(false);
   const [mounted, setMounted] = useState(false);
   // New state to track if activity modal is open
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
@@ -44,13 +45,32 @@ export function Header({
   // MODAL DISPONIBLE MUY PRONTO
   // Solo para Espacios
   const [showEspaciosModal, setShowEspaciosModal] = useState(false);
+  // submenu de Oferta Educativa (copiado de Header1)
+  const [showOfertaMenu, setShowOfertaMenu] = useState(false);
 
   const { isLoaded: isAuthLoaded } = useAuth();
+  // Nav items adjusted to match Header1 order and labels
   const navItems = [
     { href: '/', label: 'Inicio' },
-    { href: '/estudiantes', label: 'Cursos' },
-    { href: '/comunidad', label: 'Espacios' },
-    { href: '/planes', label: 'Planes' },
+    { href: '#', label: 'Oferta Educativa' }, // handled via ofertaMenu
+    { href: '/about', label: '¿ Quienes Somos ?' },
+    { href: '/estudiantes', label: 'Estudiantes' },
+    { href: '#sedes', label: 'Sedes' },
+  ];
+
+  const ofertaMenu = [
+    {
+      name: 'Diplomados y Cursos',
+      slug: 'diplomados',
+      icon: '📚',
+      href: '/estudiantes#cursos-list-section',
+    },
+    {
+      name: 'Carreras técnicas',
+      slug: 'carreras-tecnicas',
+      icon: '🛠️',
+      href: '/programs',
+    },
   ];
 
   const toggleDropdown = () => {
@@ -123,6 +143,10 @@ export function Header({
       if (!target.closest('.header-menu')) {
         setIsDropdownOpen(false);
       }
+      // cerrar Oferta Educativa si se hace click fuera
+      if (!target.closest('.oferta-menu')) {
+        setShowOfertaMenu(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -133,28 +157,25 @@ export function Header({
     setMounted(true);
   }, []);
 
-  const handleSignInClick = () => {
-    setIsLoading(true);
-    // Simulate loading
-    setTimeout(() => setIsLoading(false), 2000);
-  };
+  const handleSearch = useCallback(() => {
+    const params = new URLSearchParams();
+    if (searchQuery) {
+      params.set('query', searchQuery);
+    }
+    router.push(`${pathname}?${params.toString()}`);
+    setTimeout(() => {
+      const resultsSection = document.getElementById('courses-list-section');
+      if (resultsSection) {
+        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 300);
+  }, [searchQuery, pathname, router]);
 
-  const handleSearch = (e?: React.FormEvent) => {
-    e?.preventDefault();
-
-    if (!searchQuery.trim() || searchInProgress) return;
-
-    setSearchInProgress(true);
-
-    // Emit global search event
-    const searchEvent = new CustomEvent('artiefy-search', {
-      detail: { query: searchQuery.trim() },
-    });
-    window.dispatchEvent(searchEvent);
-
-    // Clear the search input
-    setSearchQuery('');
-    setSearchInProgress(false);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+    }
   };
 
   const renderAuthButton = () => {
@@ -175,23 +196,27 @@ export function Header({
         ) : (
           <>
             <SignedOut>
-              <SignInButton>
-                <Button
-                  className="border-primary bg-primary text-background hover:bg-background hover:text-primary relative skew-x-[-15deg] cursor-pointer rounded-none border p-5 text-xl font-light italic transition-all duration-200 hover:shadow-[0_0_30px_5px_rgba(0,189,216,0.815)] active:scale-95"
-                  style={{
-                    transition: '0.5s',
-                    width: '180px',
-                  }}
-                  onClick={handleSignInClick}
+              {/* Usar mismo markup / estilos que Header1 para mantener apariencia */}
+              <SignInButton mode="modal">
+                <div
+                  aria-label="User Login Button"
+                  tabIndex={0}
+                  role="button"
+                  className="user-profile"
                 >
-                  <span className="relative skew-x-[15deg] overflow-hidden font-semibold">
-                    {isLoading ? (
-                      <Icons.spinner className="size-6" />
-                    ) : (
-                      'Iniciar Sesión'
-                    )}
-                  </span>
-                </Button>
+                  <div className="user-profile-inner">
+                    <svg
+                      aria-hidden="true"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                    >
+                      <g data-name="Layer 2" id="Layer_2">
+                        <path d="m15.626 11.769a6 6 0 1 0 -7.252 0 9.008 9.008 0 0 0 -5.374 8.231 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 9.008 9.008 0 0 0 -5.374-8.231zm-7.626-4.769a4 4 0 1 1 4 4 4 4 0 0 1 -4-4zm10 14h-12a1 1 0 0 1 -1-1 7 7 0 0 1 14 0 1 1 0 0 1 -1 1z" />
+                      </g>
+                    </svg>
+                    <p>Iniciar sesión</p>
+                  </div>
+                </div>
               </SignInButton>
             </SignedOut>
 
@@ -226,10 +251,39 @@ export function Header({
   //   setShowProyectosModal(true);
   //   onProyectosClickAction?.();
   // };
-  const handleEspaciosClick = (e?: React.MouseEvent) => {
+  // prefix with _ to silence eslint
+  const _handleEspaciosClick = (e?: React.MouseEvent) => {
     e?.preventDefault();
     setShowEspaciosModal(true);
     onEspaciosClickAction?.();
+  };
+
+  // Sincroniza el input con el parámetro query de la URL
+  useEffect(() => {
+    const q = searchParams?.get('query') ?? '';
+    setSearchQuery(q);
+  }, [searchParams]);
+
+  // Helper para scroll a la sección de cursos
+  const handleDiplomadosClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setShowOfertaMenu(false);
+    if (window.location.pathname === '/estudiantes') {
+      setTimeout(() => {
+        const el = document.getElementById('courses-list-section');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    } else {
+      window.location.href = '/estudiantes#courses-list-section';
+    }
+  };
+
+  const handleCarrerasClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setShowOfertaMenu(false);
+    window.location.href = '/programs';
   };
 
   return (
@@ -276,23 +330,23 @@ export function Header({
         </DialogPanel>
       </Dialog>
       <header
-        className={`sticky top-0 w-full transition-all duration-300 ${
-          isScrolled
-            ? 'bg-opacity-80 bg-[#01142B] shadow-md backdrop-blur-sm'
-            : 'md:py-3'
-        } ${!isHeaderVisible ? '-translate-y-full' : 'translate-y-0'} div-header-nav ${
+        className={`sticky top-0 w-full transition-transform duration-300 ${
+          !isHeaderVisible ? '-translate-y-full' : 'translate-y-0'
+        } div-header-nav bg-white shadow ${
           isActivityModalOpen ? 'z-40' : 'z-[9999]'
         }`}
       >
-        <div className="container mx-auto max-w-7xl px-4 py-8">
+        {/* Use same container / spacing as Header1 (min height, padding) */}
+        <div className="container mx-auto flex min-h-[120px] items-center justify-between px-6 py-8">
           <div className="hidden w-full items-center md:flex md:justify-between">
             {!isScrolled ? (
               <div className="flex w-full items-center justify-between">
                 <div className="shrink-0">
                   <Link href="/estudiantes">
+                    {/* título / logo con estilo Header1 */}
                     <div className="flex items-center rounded-lg bg-blue-100 px-6 py-3 shadow-lg">
                       <span
-                        className="font-serif text-3xl font-extrabold tracking-wide text-blue-700 drop-shadow-lg md:text-4xl lg:text-5xl"
+                        className="font-serif text-5xl font-extrabold tracking-wide text-blue-700 drop-shadow-lg md:text-6xl lg:text-7xl"
                         style={{
                           letterSpacing: '0.04em',
                           textShadow:
@@ -304,58 +358,125 @@ export function Header({
                     </div>
                   </Link>
                 </div>
-                <div className="div-header-nav flex gap-24">
+                {/* usar spacing y look de Header1; add extra margin-left to separate logo from labels */}
+                <div className="div-header-nav ml-8 flex items-center gap-6">
                   {navItems.map((item) => {
-                    const extraClass = `div-header-${item.label.toLowerCase()}`;
-                    // Proyectos: acceso directo
-                    if (item.label === 'Proyectos') {
+                    // Oferta Educativa
+                    if (item.label === 'Oferta Educativa') {
+                      return (
+                        <div
+                          key="oferta"
+                          className="oferta-menu relative inline-block"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setShowOfertaMenu((s) => !s)}
+                            className={`flex items-center border-none bg-transparent p-0 text-lg font-bold ${
+                              isScrolled ? 'text-primary' : 'text-black'
+                            } underline-offset-4 transition hover:text-blue-700 hover:underline focus:text-blue-700 focus:underline`}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Oferta Educativa
+                            <span className="ml-2">
+                              <svg
+                                width="22"
+                                height="22"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                              >
+                                <rect
+                                  x="4"
+                                  y="7"
+                                  width="16"
+                                  height="2"
+                                  rx="1"
+                                  fill="#2563eb"
+                                />
+                                <rect
+                                  x="4"
+                                  y="11"
+                                  width="16"
+                                  height="2"
+                                  rx="1"
+                                  fill="#2563eb"
+                                />
+                                <rect
+                                  x="4"
+                                  y="15"
+                                  width="16"
+                                  height="2"
+                                  rx="1"
+                                  fill="#2563eb"
+                                />
+                              </svg>
+                            </span>
+                          </button>
+                          {showOfertaMenu && (
+                            <div className="absolute top-full left-0 z-50 mt-2 w-56 rounded-xl border border-blue-100 bg-white shadow-lg">
+                              <ul className="py-2">
+                                {ofertaMenu.map((m) => (
+                                  <li key={m.slug}>
+                                    <Link
+                                      href={m.href}
+                                      className="flex items-center px-4 py-2 font-semibold text-blue-900 transition hover:bg-blue-50 hover:text-blue-700"
+                                    >
+                                      <span className="mr-2 text-xl">
+                                        {m.icon}
+                                      </span>
+                                      <span>{m.name}</span>
+                                    </Link>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    // Estudiantes: subrayado azul si activo
+                    if (item.label === 'Estudiantes') {
                       return (
                         <Link
                           key={item.href}
                           href={item.href}
-                          className={`text-lg font-light tracking-wide whitespace-nowrap text-white transition-colors hover:text-orange-500 active:scale-95 ${extraClass}`}
+                          className={`text-lg font-bold underline-offset-4 transition-colors ${
+                            isScrolled ? 'text-primary' : 'text-black'
+                          } ${
+                            pathname === '/estudiantes'
+                              ? 'text-blue-700 underline'
+                              : 'hover:text-blue-700 hover:underline focus:text-blue-700 focus:underline'
+                          }`}
                         >
                           {item.label}
                         </Link>
                       );
                     }
-                    // Espacios: mostrar modal
-                    if (item.label === 'Espacios') {
-                      return (
-                        <button
-                          key={item.href}
-                          type="button"
-                          className={`text-lg font-light tracking-wide whitespace-nowrap text-white transition-colors hover:text-orange-500 active:scale-95 ${extraClass} cursor-pointer border-0 bg-transparent outline-none`}
-                          onClick={handleEspaciosClick}
-                        >
-                          {item.label}
-                        </button>
-                      );
-                    }
-                    // Cursos: subrayado si pathname === '/estudiantes' y hover azul solo si no está activo
-                    if (item.label === 'Cursos') {
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={`text-lg font-light tracking-wide whitespace-nowrap transition-colors active:scale-95 ${extraClass} ${pathname === '/estudiantes' ? 'text-blue-700 underline underline-offset-4' : 'text-white hover:text-blue-700'}`}
-                        >
-                          {item.label}
-                        </Link>
-                      );
-                    }
+                    // Otros labels: negros, hover azul, subrayado azul si activo
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`text-lg font-light tracking-wide whitespace-nowrap text-white transition-colors hover:text-orange-500 active:scale-95 ${extraClass}`}
+                        className={`text-lg font-bold underline-offset-4 transition-colors ${
+                          isScrolled ? 'text-primary' : 'text-black'
+                        } ${
+                          pathname === item.href
+                            ? 'text-blue-700 underline'
+                            : 'hover:text-blue-700 hover:underline focus:text-blue-700 focus:underline'
+                        }`}
                       >
                         {item.label}
                       </Link>
                     );
                   })}
                 </div>
-                <div className="flex justify-end">{renderAuthButton()}</div>
+                {/* place auth button further separated from nav like Header1 */}
+                <div className="ml-6 flex items-center justify-end">
+                  {renderAuthButton()}
+                </div>
               </div>
             ) : (
               <div className="flex w-full items-center">
@@ -380,10 +501,13 @@ export function Header({
                     <div className="header-search-container">
                       <input
                         type="search"
-                        placeholder="Buscar..."
+                        name="search"
+                        className="header-input text-background w-full bg-white pr-10"
+                        placeholder="Buscar cursos..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="header-input border-primary"
+                        onKeyDown={handleKeyDown}
+                        aria-label="Buscar cursos"
                       />
                       <svg
                         viewBox="0 0 24 24"
@@ -395,76 +519,127 @@ export function Header({
                     </div>
                   </form>
                 </div>
+                {/* small-screen menu + auth */}
                 <div className="flex items-center gap-4">
                   <div className="header-menu">
                     <button
-                      className="menu-selected"
+                      className="menu-selected flex items-center gap-2"
                       onClick={toggleDropdown}
                       type="button"
                     >
-                      Menú
+                      <span className="font-bold text-black">Menú</span>
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 512 512"
-                        className={`menu-arrow ${isDropdownOpen ? 'rotate' : ''}`}
+                        className={`menu-arrow text-black ${isDropdownOpen ? 'rotate' : ''}`}
+                        style={{ width: 22, height: 22 }}
                       >
                         <path d="M233.4 406.6c12.5 12.5 32.8 12.5 45.3 0l192-192c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L256 338.7 86.6 169.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l192 192z" />
                       </svg>
                     </button>
                     <div
-                      className={`menu-options ${isDropdownOpen ? 'show' : ''}`}
+                      className={`menu-options ${isDropdownOpen ? 'show' : ''} rounded-xl border border-blue-100 bg-white py-2 shadow-lg`}
+                      style={{
+                        minWidth: 220,
+                        marginTop: 12,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                      }}
                     >
-                      {navItems.map((item) => {
-                        // Proyectos: acceso directo
-                        if (item.label === 'Proyectos') {
+                      <ul className="flex flex-col gap-1">
+                        {navItems.map((item) => {
+                          // Oferta Educativa -> submenú lateral izquierdo para evitar taparse
+                          if (item.label === 'Oferta Educativa') {
+                            return (
+                              <li
+                                key="oferta"
+                                className="group relative"
+                                style={{ position: 'relative' }}
+                              >
+                                <div
+                                  className={`mb-2 rounded px-4 py-2 font-bold transition-colors ${
+                                    pathname === item.href
+                                      ? 'text-blue-700 underline underline-offset-4'
+                                      : isScrolled
+                                        ? 'text-primary'
+                                        : 'text-black'
+                                  } cursor-pointer group-hover:text-blue-700`}
+                                  tabIndex={0}
+                                >
+                                  Oferta Educativa
+                                </div>
+                                {/* Submenú lateral a la izquierda, usando left-auto y right-0 y mayor separación */}
+                                <ul
+                                  className="absolute top-0 right-[90%] left-auto z-50 w-56 rounded-xl border border-blue-100 bg-white opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100"
+                                  style={{
+                                    marginLeft: '0',
+                                    marginRight: '32px',
+                                  }}
+                                >
+                                  <li key="diplomados">
+                                    <a
+                                      href="/estudiantes#courses-list-section"
+                                      className="flex items-center px-4 py-2 font-semibold text-black transition-colors hover:text-blue-700"
+                                      onClick={handleDiplomadosClick}
+                                    >
+                                      <span className="mr-2 text-xl">📚</span>
+                                      <span>Diplomados y Cursos</span>
+                                    </a>
+                                  </li>
+                                  <li key="carreras-tecnicas">
+                                    <a
+                                      href="/programs"
+                                      className="flex items-center px-4 py-2 font-semibold text-black transition-colors hover:text-blue-700"
+                                      onClick={handleCarrerasClick}
+                                    >
+                                      <span className="mr-2 text-xl">🛠️</span>
+                                      <span>Carreras técnicas</span>
+                                    </a>
+                                  </li>
+                                </ul>
+                              </li>
+                            );
+                          }
+                          // Estudiantes: subrayado azul si activo
+                          if (item.label === 'Estudiantes') {
+                            return (
+                              <li key={item.href}>
+                                <Link
+                                  href={item.href}
+                                  className={`block rounded px-4 py-2 text-lg transition-colors ${
+                                    pathname === item.href
+                                      ? 'text-blue-700 underline underline-offset-4'
+                                      : isScrolled
+                                        ? 'text-primary'
+                                        : 'text-black'
+                                  } hover:text-blue-700 hover:underline focus:text-blue-700 focus:underline`}
+                                  onClick={() => setMobileMenuOpen(false)}
+                                >
+                                  {item.label}
+                                </Link>
+                              </li>
+                            );
+                          }
+                          // Otros labels: negros, hover azul, subrayado azul si activo
                           return (
-                            <Link
-                              key={item.href}
-                              href={item.href}
-                              className="menu-option hover:text-orange-500"
-                              onClick={toggleDropdown}
-                            >
-                              {item.label}
-                            </Link>
+                            <li key={item.href}>
+                              <Link
+                                href={item.href}
+                                className={`block rounded px-4 py-2 text-lg transition-colors ${
+                                  pathname === item.href
+                                    ? 'text-blue-700 underline underline-offset-4'
+                                    : isScrolled
+                                      ? 'text-primary'
+                                      : 'text-black'
+                                } hover:text-blue-700 hover:underline focus:text-blue-700 focus:underline`}
+                                onClick={() => setMobileMenuOpen(false)}
+                              >
+                                {item.label}
+                              </Link>
+                            </li>
                           );
-                        }
-                        // Espacios: mostrar modal
-                        if (item.label === 'Espacios') {
-                          return (
-                            <button
-                              key={item.href}
-                              type="button"
-                              className="menu-option hover:text-orange-500"
-                              onClick={handleEspaciosClick}
-                            >
-                              {item.label}
-                            </button>
-                          );
-                        }
-                        // Cursos: subrayado si pathname === '/estudiantes' y hover azul solo si no está activo
-                        if (item.label === 'Cursos') {
-                          return (
-                            <Link
-                              key={item.href}
-                              href={item.href}
-                              className={`menu-option active:scale-95 ${pathname === '/estudiantes' ? 'text-blue-700 underline underline-offset-4' : 'hover:text-blue-700'}`}
-                              onClick={toggleDropdown}
-                            >
-                              {item.label}
-                            </Link>
-                          );
-                        }
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className="menu-option hover:text-orange-500"
-                            onClick={toggleDropdown}
-                          >
-                            {item.label}
-                          </Link>
-                        );
-                      })}
+                        })}
+                      </ul>
                     </div>
                   </div>
                   <div className="flex justify-end">{renderAuthButton()}</div>
@@ -472,6 +647,7 @@ export function Header({
               </div>
             )}
           </div>
+          {/* mobile header fallback */}
           <div className="flex w-full items-center justify-between md:hidden">
             <div className="shrink-0">
               <Link href="/estudiantes">
@@ -512,14 +688,14 @@ export function Header({
           className="fixed inset-0 z-50 md:hidden"
         >
           <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-          <DialogPanel className="fixed inset-y-0 right-0 z-50 w-[65%] max-w-sm bg-white p-6 shadow-xl">
+          <DialogPanel className="fixed inset-y-0 top-16 right-0 z-50 w-[65%] max-w-sm bg-white p-6 shadow-xl">
             <div className="mt-9 flex items-center justify-between">
               <div className="relative size-[150px]">
                 <Link href="/estudiantes">
                   <div className="relative size-[150px]">
                     <Image
-                      src="/artiefy-logo2.svg"
-                      alt="Logo Artiefy Mobile"
+                      src="/CCOET-logo2.svg"
+                      alt="Logo CCOET Mobile"
                       fill
                       unoptimized
                       className="object-contain"
@@ -539,13 +715,39 @@ export function Header({
             <nav className="pb-7">
               <ul className="space-y-12">
                 {navItems.map((item) => {
-                  // Proyectos: acceso directo
-                  if (item.label === 'Proyectos') {
+                  // Oferta Educativa -> mostrar sublista de ofertaMenu
+                  if (item.label === 'Oferta Educativa') {
+                    return (
+                      <li key="oferta">
+                        <div className="mb-2 font-bold">Oferta Educativa</div>
+                        <ul className="ml-4 space-y-2">
+                          {ofertaMenu.map((m) => (
+                            <li key={m.slug}>
+                              <Link
+                                href={m.href}
+                                className="block text-lg text-gray-900 transition-colors hover:text-blue-700"
+                                onClick={() => setMobileMenuOpen(false)}
+                              >
+                                {m.name}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    );
+                  }
+
+                  // Estudiantes -> enlace destacado cuando corresponde
+                  if (item.label === 'Estudiantes') {
                     return (
                       <li key={item.href}>
                         <Link
                           href={item.href}
-                          className="block text-lg text-gray-900 transition-colors hover:text-orange-500 active:scale-95"
+                          className={`block text-lg text-gray-900 transition-colors active:scale-95 ${
+                            pathname === '/estudiantes'
+                              ? 'text-blue-700 underline underline-offset-4'
+                              : 'hover:text-blue-700'
+                          }`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
                           {item.label}
@@ -553,34 +755,8 @@ export function Header({
                       </li>
                     );
                   }
-                  // Espacios: mostrar modal
-                  if (item.label === 'Espacios') {
-                    return (
-                      <li key={item.href}>
-                        <button
-                          type="button"
-                          className="block w-full cursor-pointer border-0 bg-transparent text-left text-lg text-gray-900 transition-colors outline-none hover:text-orange-500 active:scale-95"
-                          onClick={handleEspaciosClick}
-                        >
-                          {item.label}
-                        </button>
-                      </li>
-                    );
-                  }
-                  // Cursos: subrayado si pathname === '/estudiantes' y hover azul solo si no está activo
-                  if (item.label === 'Cursos') {
-                    return (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          className={`block text-lg text-gray-900 transition-colors active:scale-95 ${pathname === '/estudiantes' ? 'text-blue-700 underline underline-offset-4' : 'hover:text-blue-700'}`}
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          {item.label}
-                        </Link>
-                      </li>
-                    );
-                  }
+
+                  // Default render para el resto de items
                   return (
                     <li key={item.href}>
                       <Link

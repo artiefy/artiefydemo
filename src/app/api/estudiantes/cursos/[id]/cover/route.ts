@@ -28,7 +28,7 @@ export async function GET(
 
     const coverImageUrl = course.coverImageKey
       ? `${process.env.NEXT_PUBLIC_AWS_S3_URL}/${course.coverImageKey}`
-      : 'https://placehold.co/1200x630/01142B/3AF4EF?text=Artiefy&font=MONTSERRAT';
+      : 'https://placehold.co/1200x630/01142B/3AF4EF?text=CCOET&font=MONTSERRAT';
 
     return NextResponse.json({ coverImageUrl });
   } catch (_error) {

@@ -6,7 +6,7 @@ import type { Metadata } from 'next';
 const sharedOpenGraph = {
   images: [
     {
-      url: 'https://artiefy.com/opengraph-image',
+      url: 'https://CCOET.com/opengraph-image',
       width: 1200,
       height: 630,
       alt: 'Unete a nosotros y transforma tus ideas en realidades con el poder del conocimiento',
@@ -26,32 +26,32 @@ export async function getCurrentPath() {
 // Common metadata that can be reused
 const defaultMetadata: Metadata = {
   title: {
-    template: '%s | Artiefy - Tu Plataforma Educativa',
-    default: 'Artiefy - Cursos Online | Aprende a Tu Ritmo',
+    template: '%s | CCOET - Tu Plataforma Educativa',
+    default: 'CCOET - Cursos Online | Aprende a Tu Ritmo',
   },
   description:
-    'Explora Artiefy, tu plataforma de aprendizaje online con cursos de alta calidad impartidos por profesionales. Desarrolla nuevas habilidades, avanza en tu carrera y expande tus horizontes con contenido educativo actualizado y accesible desde cualquier lugar. Únete a nuestra comunidad de estudiantes y transforma tu futuro profesional.',
+    'Explora CCOET, tu plataforma de aprendizaje online con cursos de alta calidad impartidos por profesionales. Desarrolla nuevas habilidades, avanza en tu carrera y expande tus horizontes con contenido educativo actualizado y accesible desde cualquier lugar. Únete a nuestra comunidad de estudiantes y transforma tu futuro profesional.',
   keywords: [
-    'artiefy',
+    'CCOET',
     'cursos online',
     'educación online',
     'plataforma educativa',
     'aprendizaje digital',
     'estudiar online',
     'formación online',
-    'artiefy educación',
-    'artiefy cursos',
-    'artiefy online',
+    'CCOET educación',
+    'CCOET cursos',
+    'CCOET online',
   ],
   metadataBase: new URL('https://artiefy.com'),
   openGraph: {
     type: 'website',
     locale: 'es_ES',
-    url: 'https://artiefy.com',
-    siteName: 'Artiefy - Plataforma de Educación Online',
+    url: 'https://CCOET.com',
+    siteName: 'CCOET - Plataforma de Educación Online',
     images: [
       {
-        url: 'https://artiefy.com/opengraph-image',
+        url: 'https://CCOET.com/opengraph-image',
         width: 1200,
         height: 630,
         alt: 'Artiefy - App Web Educativa de Cursos Online',
@@ -60,8 +60,8 @@ const defaultMetadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    site: '@artiefy',
-    creator: '@artiefy',
+    site: '@CCOET',
+    creator: '@CCOET',
   },
   verification: {
     google: 'QmeSGzDRcYJKY61p9oFybVx-HXlsoT5ZK6z9x2L3Wp4',
@@ -101,14 +101,14 @@ export async function getMetadataForRoute(): Promise<Metadata> {
     case '/':
       return {
         ...baseMetadata,
-        title: 'Artiefy - Cursos Online | Impulsa tu Futuro Profesional',
+        title: 'CCOET - Cursos Online | Impulsa tu Futuro Profesional',
         description:
-          'Descubre Artiefy, la plataforma educativa líder que ofrece cursos online de calidad impartidos por expertos del sector. Aprende a tu ritmo, accede a contenidos actualizados y desarrolla habilidades relevantes para el mercado laboral actual. Transforma tu potencial profesional con nuestra metodología innovadora.',
+          'Descubre CCOET, la plataforma educativa líder que ofrece cursos online de calidad impartidos por expertos del sector. Aprende a tu ritmo, accede a contenidos actualizados y desarrolla habilidades relevantes para el mercado laboral actual. Transforma tu potencial profesional con nuestra metodología innovadora.',
         keywords: [
-          'artiefy',
-          'artiefy plataforma',
-          'cursos artiefy',
-          'educación online artiefy',
+          'CCOET',
+          'CCOET plataforma',
+          'cursos CCOET',
+          'educación online CCOET',
           'plataforma educativa',
           'cursos online',
           'educación digital',
@@ -117,7 +117,7 @@ export async function getMetadataForRoute(): Promise<Metadata> {
         alternates: { canonical: getCanonical('/') },
         openGraph: {
           ...baseMetadata.openGraph,
-          title: 'Artiefy - Cursos Online',
+          title: 'CCOET - Cursos Online',
           url: getCanonical('/'),
         },
       };
@@ -125,14 +125,14 @@ export async function getMetadataForRoute(): Promise<Metadata> {
     case '/estudiantes':
       return {
         ...baseMetadata,
-        title: 'Cursos Online | Formación Integral en Artiefy',
+        title: 'Cursos Online | Formación Integral en CCOET',
         description:
           'Explora nuestra completa biblioteca de cursos y programas diseñados para potenciar tu desarrollo profesional. Con más de 100 cursos especializados, encuentras formación actualizada en tecnología, negocios, marketing digital, idiomas y muchas áreas más. Aprende con metodologías prácticas y certificados reconocidos en el mercado.',
         keywords: [
-          'artiefy cursos',
-          'programas artiefy',
-          'cursos online artiefy',
-          'estudiantes artiefy',
+          'CCOET cursos',
+          'programas CCOET',
+          'cursos online CCOET',
+          'estudiantes CCOET',
           'formación profesional',
           'cursos digitales',
           'programas educativos',
@@ -140,7 +140,7 @@ export async function getMetadataForRoute(): Promise<Metadata> {
         alternates: { canonical: getCanonical('/estudiantes') },
         openGraph: {
           ...baseMetadata.openGraph,
-          title: 'Artiefy - Cursos',
+          title: 'CCOET - Cursos',
           url: getCanonical('/estudiantes'),
         },
       };
@@ -149,13 +149,13 @@ export async function getMetadataForRoute(): Promise<Metadata> {
       return {
         ...baseMetadata,
         title:
-          'Planes de Suscripción Educativos | Invierte en tu Futuro con Artiefy',
+          'Planes de Suscripción Educativos | Invierte en tu Futuro con CCOET',
         description:
-          'Encuentra el plan perfecto para tu formación en Artiefy. Desde suscripciones básicas hasta planes premium con acceso ilimitado a cursos, proyectos prácticos, mentoría personalizada y certificados digitales. Invierte en tu educación continua con precios accesibles y contenido de calidad que impulsa tu carrera profesional.',
+          'Encuentra el plan perfecto para tu formación en CCOET. Desde suscripciones básicas hasta planes premium con acceso ilimitado a cursos, proyectos prácticos, mentoría personalizada y certificados digitales. Invierte en tu educación continua con precios accesibles y contenido de calidad que impulsa tu carrera profesional.',
         keywords: [
-          'planes artiefy',
-          'suscripción artiefy',
-          'precios artiefy',
+          'planes CCOET',
+          'suscripción CCOET',
+          'precios CCOET',
           'membresía artiefy',
           'planes educativos',
           'suscripción cursos online',
@@ -164,7 +164,7 @@ export async function getMetadataForRoute(): Promise<Metadata> {
         alternates: { canonical: getCanonical('/planes') },
         openGraph: {
           ...baseMetadata.openGraph,
-          title: 'Artiefy - Planes de Suscripción',
+          title: 'CCOET - Planes de Suscripción',
           url: getCanonical('/planes'),
         },
       };
