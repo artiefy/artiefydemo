@@ -1,8 +1,9 @@
+/* eslint-disable @next/next/no-img-element */
 import { ImageResponse } from 'next/og';
 
 // Tamaño estándar OG
 export const size = {
-  width: 1200,
+  width: 1200, 
   height: 630,
 };
 export const contentType = 'image/png';
@@ -45,7 +46,6 @@ export default async function Image({ params }: { params: { id: string } }) {
           position: 'relative',
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={coverImageUrl}
           width={1200}

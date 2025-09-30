@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import { ImageResponse } from 'next/og';
 
 // Puedes ajustar el tamaño si lo deseas
@@ -5,7 +6,7 @@ export const size = {
   width: 1200,
   height: 630,
 };
-export const contentType = 'image/png';
+export const contentType = 'image/png'; 
 
 export const alt = 'Portada del curso en Artiefy';
 
@@ -48,7 +49,6 @@ export default async function Image({ params }: { params: { id: string } }) {
           position: 'relative',
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={coverImageUrl}
           width={1200}
@@ -60,7 +60,6 @@ export default async function Image({ params }: { params: { id: string } }) {
           }}
           alt="Portada del curso"
         />
-        {/* Puedes agregar overlays, logo, título, etc. aquí si lo deseas */}
       </div>
     ),
     {

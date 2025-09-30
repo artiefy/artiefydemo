@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense } from 'react'; 
 
 import { notFound, redirect } from 'next/navigation';
 
@@ -20,7 +20,7 @@ interface PageProps {
 export default async function CertificatePage({ params }: PageProps) {
   const [resolvedParams, { userId }] = await Promise.all([
     params,
-    await auth(),
+    auth(),
   ]);
 
   if (!resolvedParams?.id) {

@@ -1,4 +1,4 @@
-'use client';
+'use client'; 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -450,19 +450,16 @@ export default function LessonDetails({
 
     try {
       saveScrollPosition();
-      const navigationPromise = router.push(`/estudiantes/clases/${targetId}`);
+      router.push(`/estudiantes/clases/${targetId}`);
       setSelectedLessonId(targetId);
 
       // Create and resolve a Promise for state updates
-      await Promise.all([
-        navigationPromise,
-        new Promise<void>((resolve) => {
-          setProgress(0);
-          setIsVideoCompleted(false);
-          setIsActivityCompleted(false);
-          resolve();
-        }),
-      ]);
+      await new Promise<void>((resolve) => {
+        setProgress(0);
+        setIsVideoCompleted(false);
+        setIsActivityCompleted(false);
+        resolve();
+      });
     } finally {
       stop();
       setIsNavigating(false);

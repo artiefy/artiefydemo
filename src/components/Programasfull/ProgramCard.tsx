@@ -5,7 +5,6 @@ import Link from 'next/link';
 
 import { ArrowRightCircleIcon, StarIcon } from '@heroicons/react/24/solid';
 
-import { EnrollmentCountSmall } from './EnrollmentCountSmall';
 import { Badge } from '~/components/estudiantes/ui/badge';
 import { Button } from '~/components/estudiantes/ui/button';
 import {
@@ -15,6 +14,8 @@ import {
   CardHeader,
 } from '~/components/estudiantes/ui/card';
 import { blurDataURL } from '~/lib/blurDataUrl';
+
+import { EnrollmentCountSmall } from './EnrollmentCountSmall';
 
 interface Category {
   name?: string;
@@ -108,7 +109,10 @@ export default function ProgramCard({ program }: ProgramCardProps) {
               {/* Conteo de estudiantes más pequeño y sin duplicado */}
               <EnrollmentCountSmall programId={parseInt(program.id)} />
             </div>
-            <Button asChild className="w-full flex-shrink-0 sm:w-auto h-7 px-2 text-xs">
+            <Button
+              asChild
+              className="h-7 w-full flex-shrink-0 px-2 text-xs sm:w-auto"
+            >
               <Link
                 href={`/estudiantes/programas/${program.id}`}
                 className="group/button bg-secondary relative inline-flex h-7 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-white/20 px-2 text-white active:scale-95 sm:h-7 sm:px-2"
