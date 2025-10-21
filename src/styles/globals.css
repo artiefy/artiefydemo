@@ -47,7 +47,7 @@
 
 @theme {
   /* Colors */
-  --color-background: oklch(19% 0.0542 252.35);
+  --color-background: oklch(1 0 0);
   --color-foreground: oklch(87.88% 0.1409 192.09);
   --color-primary: oklch(87.88% 0.1409 192.09);
   --color-primary-foreground: oklch(0.985 0 0);

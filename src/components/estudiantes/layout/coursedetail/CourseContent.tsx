@@ -62,6 +62,96 @@ function formatDuration(minutes: number): string {
   }
 }
 
+// Nuevo formateador para el estilo solicitado
+function formatMeetingDateTimeModern(startDate: string, endDate: string) {
+  if (!startDate) return '';
+  const matchStart =
+    /^([0-9]{4})-([0-9]{2})-([0-9]{2})[T\s]([0-9]{2}):([0-9]{2})/.exec(
+      startDate
+    );
+  const matchEnd = endDate
+    ? /^([0-9]{4})-([0-9]{2})-([0-9]{2})[T\s]([0-9]{2}):([0-9]{2})/.exec(
+        endDate
+      )
+    : null;
+  if (!matchStart) return startDate;
+  const [, , month, day, hour, minute] = matchStart;
+  const meses = [
+    'Ene',
+    'Feb',
+    'Mar',
+    'Abr',
+    'May',
+    'Jun',
+    'Jul',
+    'Ago',
+    'Sept',
+    'Oct',
+    'Nov',
+    'Dic',
+  ];
+  const mesNombre = meses[parseInt(month, 10) - 1];
+  // Hora inicio
+  const h = parseInt(hour, 10);
+  let hour12 = h % 12;
+  if (hour12 === 0) hour12 = 12;
+  const ampm = h < 12 ? 'a. m.' : 'p. m.';
+  const minStr = minute.padStart(2, '0');
+  // Hora fin
+  let horaFin = '';
+  if (matchEnd) {
+    const h2 = parseInt(matchEnd[4], 10);
+    let hour12_2 = h2 % 12;
+    if (hour12_2 === 0) hour12_2 = 12;
+    const ampm2 = h2 < 12 ? 'a. m.' : 'p. m.';
+    const minStr2 = matchEnd[5].padStart(2, '0');
+    horaFin = `${hour12_2}:${minStr2} ${ampm2}`;
+  }
+  return (
+    <>
+      {/* En móviles: apilar fecha y hora verticalmente con tamaños más pequeños */}
+      <div className="block sm:hidden">
+        <span className="block text-sm font-bold text-yellow-400">
+          {mesNombre} {parseInt(day, 10)},
+        </span>
+        <span className="block text-sm font-bold text-cyan-400">
+          {hour12}:{minStr} {ampm}
+          {horaFin && ` — ${horaFin}`}
+        </span>
+      </div>
+      {/* En desktop: mantener diseño inline original */}
+      <div className="hidden sm:block">
+        <span className="text-base font-bold text-yellow-400">
+          {mesNombre} {parseInt(day, 10)},
+        </span>{' '}
+        <span className="text-base font-bold text-cyan-400">
+          {hour12}:{minStr} {ampm}
+        </span>
+        {horaFin && (
+          <>
+            <span className="text-base font-bold text-cyan-400">
+              {' '}
+              — {horaFin}
+            </span>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+interface Lesson {
+  id: number;
+  title: string;
+  description?: string;
+  duration: number;
+  orderIndex?: number;
+  isLocked?: boolean;
+  isNew?: boolean;
+  porcentajecompletado?: number;
+  // ...otros campos necesarios...
+}
+
 export function CourseContent({
   course,
   isEnrolled,
@@ -174,7 +264,8 @@ export function CourseContent({
   };
 
   const memoizedLessons = useMemo(() => {
-    return sortLessons(course.lessons).map((lesson) => {
+    // sortLessons usa orderIndex, así que el orden será correcto
+    return sortLessons(course.lessons as Lesson[]).map((lesson) => {
       const isUnlocked =
         isEnrolled &&
         (course.courseType?.requiredSubscriptionLevel === 'none' ||
@@ -189,11 +280,11 @@ export function CourseContent({
       return (
         <div
           key={lesson.id}
-          className={`overflow-hidden rounded-lg border transition-colors ${
+          className={`overflow-hidden rounded-lg border-0 transition-colors ${
             isUnlocked
-              ? 'bg-gray-50 hover:bg-gray-100'
-              : 'bg-gray-100 opacity-75'
-          }`}
+              ? 'bg-gray-800 hover:bg-gray-700'
+              : 'bg-gray-800 opacity-75'
+          } text-white`}
         >
           <button
             className="flex w-full items-center justify-between px-6 py-4"
@@ -207,9 +298,9 @@ export function CourseContent({
                 ) : (
                   <FaLock className="mr-2 size-5 text-gray-400" />
                 )}
-                <span className="text-background font-medium">
+                <span className="font-medium text-white">
                   {lesson.title}{' '}
-                  <span className="ml-2 text-sm text-gray-500">
+                  <span className="ml-2 text-sm text-gray-300">
                     ({lesson.duration} mins)
                   </span>
                 </span>
@@ -232,14 +323,14 @@ export function CourseContent({
             </div>
           </button>
           {expandedLesson === lesson.id && isUnlocked && (
-            <div className="border-t bg-white px-6 py-4">
-              <p className="mb-4 text-gray-700">
+            <div className="border-t border-gray-700 bg-gray-900 px-6 py-4">
+              <p className="mb-4 text-gray-300">
                 {lesson.description ??
                   'No hay descripción disponible para esta clase.'}
               </p>
               <div className="mb-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-700">
+                  <p className="text-sm font-semibold text-gray-300">
                     Progreso De La Clase:
                   </p>
                 </div>
@@ -253,7 +344,7 @@ export function CourseContent({
                 href={`/estudiantes/clases/${lesson.id}`}
                 onClick={handleClick}
               >
-                <button className="buttonclass text-background transition-none active:scale-95">
+                <button className="buttonclass text-black transition-none active:scale-95">
                   <div className="outline" />
                   <div className="state state--default">
                     <div className="icon">
@@ -532,17 +623,6 @@ export function CourseContent({
       : [];
   }, [classMeetings]);
 
-  // Add this helper function to format the date in Spanish
-  const formatSpanishDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const options: Intl.DateTimeFormatOptions = {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    };
-    return date.toLocaleDateString('es-ES', options);
-  };
-
   // Identificar la próxima clase en vivo (la más cercana en tiempo)
   const nextMeetingId = useMemo(() => {
     if (upcomingMeetings.length === 0) return null;
@@ -557,24 +637,15 @@ export function CourseContent({
       // Si es la próxima clase programada, está disponible
       if (meeting.id === nextMeetingId) return true;
 
-      // Get current date in Colombia time (UTC-5)
-      const colombiaOptions = { timeZone: 'America/Bogota' };
+      // Usar directamente los datos de BD sin conversión de zona horaria
       const now = new Date();
-      const todayInColombia = new Date(
-        now.toLocaleString('en-US', colombiaOptions)
-      );
-
-      // Get meeting date in Colombia time
       const meetingDate = new Date(meeting.startDateTime);
-      const meetingDateInColombia = new Date(
-        meetingDate.toLocaleString('en-US', colombiaOptions)
-      );
 
-      // Compare year, month, and day
+      // Compare year, month, and day directly
       return (
-        todayInColombia.getFullYear() === meetingDateInColombia.getFullYear() &&
-        todayInColombia.getMonth() === meetingDateInColombia.getMonth() &&
-        todayInColombia.getDate() === meetingDateInColombia.getDate()
+        now.getFullYear() === meetingDate.getFullYear() &&
+        now.getMonth() === meetingDate.getMonth() &&
+        now.getDate() === meetingDate.getDate()
       );
     },
     [nextMeetingId]
@@ -693,14 +764,20 @@ export function CourseContent({
                             color: '#00BDD8', // secondary
                           }}
                         >
-                          {formatSpanishDate(upcomingMeetings[0].startDateTime)}
+                          {new Date(
+                            upcomingMeetings[0].startDateTime
+                          ).toLocaleDateString('es-ES', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          })}
                         </span>
                         {upcomingMeetings[0].startDateTime && (
                           <span className="mt-1 block sm:hidden">
                             <span
                               className="inline-block rounded-full border border-cyan-300 bg-cyan-200 px-3 py-0.5 text-[11px] font-bold"
                               style={{
-                                color: '#006b7a', // secondary más oscuro
+                                color: '#006b7a',
                                 textDecoration: 'none',
                               }}
                             >
@@ -731,9 +808,13 @@ export function CourseContent({
                             className="font-extrabold underline underline-offset-2"
                             style={{ color: '#00BDD8' }}
                           >
-                            {formatSpanishDate(
+                            {new Date(
                               upcomingMeetings[0].startDateTime
-                            )}
+                            ).toLocaleDateString('es-ES', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            })}
                           </span>
                           {upcomingMeetings[0].startDateTime && (
                             <>
@@ -741,7 +822,7 @@ export function CourseContent({
                               <span
                                 className="ml-1 inline-block rounded border border-cyan-300 bg-cyan-200 px-1.5 py-0.5 text-base font-bold"
                                 style={{
-                                  color: '#006b7a', // secondary más oscuro
+                                  color: '#006b7a',
                                   textDecoration: 'none',
                                 }}
                               >
@@ -826,6 +907,7 @@ export function CourseContent({
                 <div className={cn('mb-6')}>
                   {/* Header with toggle button for live classes */}
                   <div className="mb-4 flex items-center justify-between">
+                    {/* Título único, eliminar doble título */}
                     <h2 className="text-xl font-bold text-white">
                       Clases en Vivo
                     </h2>
@@ -853,220 +935,351 @@ export function CourseContent({
                       !showLiveClasses && 'hidden'
                     )}
                   >
-                    {liveMeetings.map((meeting: ClassMeeting) => {
-                      const isAvailable = isMeetingAvailable(meeting);
-                      const isNext = meeting.id === nextMeetingId;
-                      // Determinar si es hoy
-                      let isToday = false;
-                      let isJoinEnabled = false;
-                      let isMeetingStarted = false;
-                      let isMeetingEnded = false;
-                      if (meeting.startDateTime && meeting.endDateTime) {
-                        const colombiaOptions = { timeZone: 'America/Bogota' };
-                        const now = new Date();
-                        const nowCol = new Date(
-                          now.toLocaleString('en-US', colombiaOptions)
-                        );
-                        const start = new Date(
-                          new Date(meeting.startDateTime).toLocaleString(
-                            'en-US',
-                            colombiaOptions
-                          )
-                        );
-                        const end = new Date(
-                          new Date(meeting.endDateTime).toLocaleString(
-                            'en-US',
-                            colombiaOptions
-                          )
-                        );
-                        isToday =
-                          nowCol.getFullYear() === start.getFullYear() &&
-                          nowCol.getMonth() === start.getMonth() &&
-                          nowCol.getDate() === start.getDate();
-                        isMeetingStarted = nowCol >= start;
-                        isMeetingEnded = nowCol > end;
-                        // Solo permitir unirse si es hoy y la hora actual está entre start y end
-                        isJoinEnabled =
-                          isToday && isMeetingStarted && !isMeetingEnded;
-                      }
+                    {/* Filtrar clases en vivo para ocultar las vencidas */}
+                    {liveMeetings
+                      .filter((meeting: ClassMeeting) => {
+                        // Ocultar cualquier clase cuya hora de fin ya pasó (vencida)
+                        if (meeting.endDateTime) {
+                          const now = new Date();
+                          const end = new Date(meeting.endDateTime);
+                          if (now > end) return false;
+                        }
+                        return true;
+                      })
+                      // Mostrar todas las futuras (se elimina el filtro de solo próxima clase)
+                      .map((meeting: ClassMeeting) => {
+                        const isAvailable = isMeetingAvailable(meeting);
+                        const isNext = meeting.id === nextMeetingId;
+                        // Determinar si es hoy usando directamente los datos de BD
+                        let isToday = false;
+                        let isJoinEnabled = false;
+                        let isMeetingEnded = false;
+                        if (meeting.startDateTime && meeting.endDateTime) {
+                          const now = new Date();
+                          const start = new Date(meeting.startDateTime);
+                          const end = new Date(meeting.endDateTime);
 
-                      // Badge: Hoy (verde SOLO si botón es "Unirse a la Clase"), gris si "Clase Finalizada"
-                      const badgeHoyClass =
-                        'rounded-full border border-green-500 bg-green-100 px-3 py-1 font-bold text-green-700 shadow-sm sm:ml-auto';
-                      const badgeFinalizadaClass =
-                        'rounded-full border border-gray-400 bg-gray-200 px-3 py-1 font-bold text-gray-700 shadow-sm sm:ml-auto';
+                          isToday =
+                            now.getFullYear() === start.getFullYear() &&
+                            now.getMonth() === start.getMonth() &&
+                            now.getDate() === start.getDate();
+                          isMeetingEnded = now > end;
+                          // Permitir unirse todo el día, solo deshabilitar si ya terminó
+                          isJoinEnabled = isToday && !isMeetingEnded;
+                        }
 
-                      // --- Botón: color según estado ---
-                      const buttonClass =
-                        'inline-flex h-8 w-[180px] items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition-all border-0';
-                      let buttonBg = '';
-                      let buttonDisabled = false;
-                      let buttonText = '';
-                      let buttonIcon = null;
-                      let buttonExtraClass = '';
+                        // Badge: Hoy (verde SOLO si botón es "Unirse a la Clase"), gris si "Clase Finalizada"
+                        const badgeHoyClass =
+                          'rounded-full border border-green-500 bg-green-100 px-3 py-1 font-bold text-green-700 shadow-sm sm:ml-auto';
+                        const badgeFinalizadaClass =
+                          'rounded-full border border-gray-400 bg-gray-200 px-3 py-1 font-bold text-gray-700 shadow-sm sm:ml-auto';
 
-                      if (isNext && !isJoinEnabled) {
-                        // Cambia el color a azul aguamarina y fuerza el texto en una sola línea
-                        buttonBg = 'buttonneon-aqua';
-                        buttonDisabled = true;
-                        buttonText = 'Próxima Clase';
-                        buttonIcon = <FaLock className="size-4" />;
-                        buttonExtraClass = 'buttonneon';
-                      } else if (isToday && isJoinEnabled) {
-                        buttonBg = 'bg-green-600 text-white hover:bg-green-700';
-                        buttonDisabled = false;
-                        buttonText = 'Unirse a la Clase';
-                        buttonIcon = <FaVideo className="size-4" />;
-                      } else if (isToday && !isJoinEnabled && isMeetingEnded) {
-                        buttonBg = 'bg-gray-400 text-white';
-                        buttonDisabled = true;
-                        buttonText = 'Clase Finalizada';
-                        buttonIcon = <FaLock className="size-4" />;
-                      } else if (!isAvailable && !isNext && !isToday) {
-                        buttonBg = 'bg-[#01142B] text-white';
-                        buttonDisabled = true;
-                        buttonText = 'Clase Bloqueada';
-                        buttonIcon = <FaLock className="size-4" />;
-                      }
+                        // --- Botón: color según estado ---
+                        const buttonClass =
+                          'inline-flex h-8 w-[180px] items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition-all border-0';
+                        let buttonBg = '';
+                        let buttonDisabled = false;
+                        let buttonText = '';
+                        let buttonIcon = null;
+                        let buttonExtraClass = '';
 
-                      return (
-                        <div
-                          key={meeting.id}
-                          className={cn(
-                            'relative flex flex-col rounded-lg border-0 p-4 shadow sm:flex-row sm:items-center',
-                            'bg-gray-800',
-                            'hover:neon-live-class'
-                          )}
-                        >
-                          <div className="flex min-w-0 flex-1 items-center gap-3">
-                            <FaVideo
-                              className={cn(
-                                'h-5 w-5 flex-shrink-0 text-cyan-600'
-                              )}
-                            />
-                            <div className="min-w-0">
-                              <h3
-                                className="truncate text-lg font-bold"
-                                style={{ color: '#fff' }}
-                              >
-                                {meeting.title}
-                              </h3>
-                              <p
-                                className="truncate text-sm"
-                                style={{ color: '#fff' }}
-                              >
-                                <strong>{meeting.title}</strong>
-                                <br />
-                                {typeof meeting.startDateTime === 'string'
-                                  ? new Date(
-                                      meeting.startDateTime
-                                    ).toLocaleString('es-CO', {
-                                      weekday: 'short',
-                                      year: 'numeric',
-                                      month: 'short',
-                                      day: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                    })
-                                  : ''}
-                                {' — '}
-                                {typeof meeting.endDateTime === 'string'
-                                  ? new Date(
-                                      meeting.endDateTime
-                                    ).toLocaleString('es-CO', {
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                    })
-                                  : ''}
-                                <span className="text-secondary ml-2 font-semibold">
-                                  {' • Duración: '}
+                        if (isNext && !isJoinEnabled) {
+                          // Cambia el color a azul aguamarina y fuerza el texto en una sola línea
+                          buttonBg = 'buttonneon-aqua';
+                          buttonDisabled = true;
+                          buttonText = 'Próxima Clase';
+                          buttonIcon = <FaLock className="size-4" />;
+                          buttonExtraClass = 'buttonneon';
+                        } else if (isToday && isJoinEnabled) {
+                          buttonBg =
+                            'bg-green-600 text-white hover:bg-green-700';
+                          buttonDisabled = false;
+                          buttonText = 'Unirse a la Clase';
+                          buttonIcon = <FaVideo className="size-4" />;
+                        } else if (
+                          isToday &&
+                          !isJoinEnabled &&
+                          isMeetingEnded
+                        ) {
+                          buttonBg = 'bg-gray-400 text-white';
+                          buttonDisabled = true;
+                          buttonText = 'Clase Finalizada';
+                          buttonIcon = <FaLock className="size-4" />;
+                        } else if (!isAvailable && !isNext && !isToday) {
+                          buttonBg = 'bg-[#01142B] text-white';
+                          buttonDisabled = true;
+                          buttonText = 'Clase Bloqueada';
+                          buttonIcon = <FaLock className="size-4" />;
+                        }
+
+                        return (
+                          <div
+                            key={meeting.id}
+                            className={cn(
+                              'relative flex flex-col rounded-lg border-0 p-4 shadow sm:flex-row sm:items-center',
+                              'bg-gray-800',
+                              'hover:neon-live-class'
+                            )}
+                          >
+                            {/* MOBILE: layout vertical y centrado */}
+                            <div className="block w-full sm:hidden">
+                              <div className="flex w-full flex-col items-center gap-2">
+                                {/* Título */}
+                                <div className="mb-1 w-full text-center text-base font-bold text-white">
+                                  {meeting.title}
+                                </div>
+                                {/* Fecha y hora */}
+                                <div className="mb-1 flex w-full flex-col items-center gap-1">
+                                  {formatMeetingDateTimeModern(
+                                    meeting.startDateTime,
+                                    meeting.endDateTime
+                                  )}
+                                </div>
+                                {/* Duración */}
+                                <div className="mb-2 w-full text-center text-sm font-bold text-green-400">
+                                  • Duración:{' '}
                                   {formatDuration(getDurationMinutes(meeting))}
-                                </span>
-                              </p>
+                                </div>
+                                {/* Badges */}
+                                <div className="mb-2 flex w-full flex-row items-center justify-center gap-2">
+                                  {isToday && isJoinEnabled && (
+                                    <Badge
+                                      variant="secondary"
+                                      className={badgeHoyClass}
+                                    >
+                                      Hoy
+                                    </Badge>
+                                  )}
+                                  {isToday &&
+                                    !isJoinEnabled &&
+                                    isMeetingEnded && (
+                                      <Badge
+                                        variant="secondary"
+                                        className={badgeFinalizadaClass}
+                                      >
+                                        Hoy
+                                      </Badge>
+                                    )}
+                                </div>
+                                {/* Botón centrado */}
+                                <div className="mt-2 flex w-full justify-center">
+                                  {meeting.joinUrl && (
+                                    <>
+                                      {isNext && !isJoinEnabled && (
+                                        <button
+                                          type="button"
+                                          className={`${buttonClass} ${buttonExtraClass} ${buttonBg}`}
+                                          disabled={buttonDisabled}
+                                          style={{
+                                            fontFamily:
+                                              'var(--font-montserrat), "Montserrat", "Istok Web", sans-serif',
+                                            whiteSpace: 'nowrap',
+                                          }}
+                                        >
+                                          {buttonIcon}
+                                          <span className="relative z-10">
+                                            {buttonText}
+                                          </span>
+                                        </button>
+                                      )}
+                                      {isToday &&
+                                        isJoinEnabled &&
+                                        meeting.joinUrl && (
+                                          <a
+                                            href={meeting.joinUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={`${buttonClass} ${buttonBg}`}
+                                            tabIndex={
+                                              !isSubscriptionActive ? -1 : 0
+                                            }
+                                            aria-disabled={
+                                              !isSubscriptionActive
+                                            }
+                                            onClick={(e) => {
+                                              if (!isSubscriptionActive)
+                                                e.preventDefault();
+                                            }}
+                                            style={{
+                                              pointerEvents:
+                                                !isSubscriptionActive
+                                                  ? 'none'
+                                                  : undefined,
+                                              opacity: !isSubscriptionActive
+                                                ? 0.6
+                                                : 1,
+                                              fontFamily:
+                                                'var(--font-montserrat), "Montserrat", "Istok Web", sans-serif',
+                                            }}
+                                          >
+                                            <FaVideo className="size-4" />
+                                            <span className="relative z-10">
+                                              Unirse a la Clase
+                                            </span>
+                                          </a>
+                                        )}
+                                      {isToday &&
+                                        !isJoinEnabled &&
+                                        isMeetingEnded && (
+                                          <button
+                                            type="button"
+                                            className={`${buttonClass} ${buttonBg}`}
+                                            disabled={buttonDisabled}
+                                            style={{
+                                              fontFamily:
+                                                'var(--font-montserrat), "Montserrat", "Istok Web", sans-serif',
+                                            }}
+                                          >
+                                            {buttonIcon}
+                                            <span className="relative z-10">
+                                              {buttonText}
+                                            </span>
+                                          </button>
+                                        )}
+                                      {!isAvailable && !isNext && !isToday && (
+                                        <button
+                                          type="button"
+                                          className={`${buttonClass} ${buttonBg}`}
+                                          disabled={buttonDisabled}
+                                          style={{
+                                            fontFamily:
+                                              'var(--font-montserrat), "Montserrat", "Istok Web", sans-serif',
+                                          }}
+                                        >
+                                          {buttonIcon}
+                                          <span className="relative z-10">
+                                            {buttonText}
+                                          </span>
+                                        </button>
+                                      )}
+                                      {!isSubscriptionActive && (
+                                        <div className="mt-2 w-full text-center text-xs font-semibold text-red-600">
+                                          Debes tener una suscripción activa
+                                          para acceder a las clases en vivo.
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                          {/* Badges al extremo derecho */}
-                          <div className="mt-3 flex min-w-fit flex-row items-center gap-2 sm:mt-0 sm:ml-4 sm:flex-col sm:items-end">
-                            {isToday && isJoinEnabled && (
-                              <Badge
-                                variant="secondary"
-                                className={badgeHoyClass}
-                              >
-                                Hoy
-                              </Badge>
-                            )}
-                            {isToday && !isJoinEnabled && isMeetingEnded && (
-                              <Badge
-                                variant="secondary"
-                                className={badgeFinalizadaClass}
-                              >
-                                Hoy
-                              </Badge>
-                            )}
-                            {/* {isNext && (
-                              <Badge
-                                variant="outline"
-                                className="rounded-full border border-yellow-500 bg-yellow-100 px-3 py-1 font-bold text-yellow-700 shadow-sm sm:ml-auto"
-                              >
-                                Próxima Clase
-                              </Badge>
-                            )} */}
-                            {/* Eliminado el Badge de Próxima Clase */}
-                          </div>
-                          {/* Botón al fondo, debajo de badges en mobile, a la derecha en desktop */}
-                          <div className="mt-3 flex min-w-fit flex-col sm:mt-0 sm:ml-4">
-                            {meeting.joinUrl && (
-                              <>
-                                {/* Botón para "Próxima Clase" (neón, nunca clickable) */}
-                                {isNext && !isJoinEnabled && (
-                                  <button
-                                    type="button"
-                                    className={`${buttonClass} ${buttonExtraClass} ${buttonBg}`}
-                                    disabled={buttonDisabled}
-                                    style={{
-                                      fontFamily:
-                                        'var(--font-montserrat), "Montserrat", "Istok Web", sans-serif',
-                                      whiteSpace: 'nowrap',
-                                    }}
-                                  >
-                                    {buttonIcon}
-                                    <span className="relative z-10">
-                                      {buttonText}
-                                    </span>
-                                  </button>
+                            {/* DESKTOP: layout horizontal como antes */}
+                            <div className="hidden min-w-0 flex-1 items-center gap-3 sm:flex">
+                              <FaVideo
+                                className={cn(
+                                  'h-5 w-5 flex-shrink-0 text-cyan-600'
                                 )}
-                                {/* Botón para "Unirse a la Clase en Teams" (verde) */}
-                                {isToday && isJoinEnabled && (
-                                  <a
-                                    href={meeting.joinUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className={`${buttonClass} ${buttonBg}`}
-                                    tabIndex={!isSubscriptionActive ? -1 : 0}
-                                    aria-disabled={!isSubscriptionActive}
-                                    onClick={(e) => {
-                                      if (!isSubscriptionActive)
-                                        e.preventDefault();
-                                    }}
-                                    style={{
-                                      pointerEvents: !isSubscriptionActive
-                                        ? 'none'
-                                        : undefined,
-                                      opacity: !isSubscriptionActive ? 0.6 : 1,
-                                      fontFamily:
-                                        'var(--font-montserrat), "Montserrat", "Istok Web", sans-serif',
-                                    }}
-                                  >
-                                    {buttonIcon}
-                                    <span className="relative z-10">
-                                      {buttonText}
-                                    </span>
-                                  </a>
-                                )}
-                                {/* Si la clase es hoy pero ya terminó, mostrar botón bloqueado (gris) */}
-                                {isToday &&
-                                  !isJoinEnabled &&
-                                  isMeetingEnded && (
+                              />
+                              <div>
+                                <div className="mb-1 text-lg leading-tight font-bold text-white">
+                                  {meeting.title}
+                                </div>
+                                <div className="mb-1 flex items-center gap-2 text-base font-medium">
+                                  {formatMeetingDateTimeModern(
+                                    meeting.startDateTime,
+                                    meeting.endDateTime
+                                  )}
+                                  <span className="ml-2 text-sm font-bold text-green-400">
+                                    • Duración:{' '}
+                                    {formatDuration(
+                                      getDurationMinutes(meeting)
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            {/* Badges desktop */}
+                            <div className="mt-3 hidden min-w-fit flex-row items-center gap-2 sm:mt-0 sm:ml-4 sm:flex sm:flex-col sm:items-end">
+                              {isToday && isJoinEnabled && (
+                                <Badge
+                                  variant="secondary"
+                                  className={badgeHoyClass}
+                                >
+                                  Hoy
+                                </Badge>
+                              )}
+                              {isToday && !isJoinEnabled && isMeetingEnded && (
+                                <Badge
+                                  variant="secondary"
+                                  className={badgeFinalizadaClass}
+                                >
+                                  Hoy
+                                </Badge>
+                              )}
+                            </div>
+                            {/* Botón desktop */}
+                            <div className="mt-3 hidden min-w-fit flex-col sm:mt-0 sm:ml-4 sm:flex">
+                              {meeting.joinUrl && (
+                                <>
+                                  {isNext && !isJoinEnabled && (
+                                    <button
+                                      type="button"
+                                      className={`${buttonClass} ${buttonExtraClass} ${buttonBg}`}
+                                      disabled={buttonDisabled}
+                                      style={{
+                                        fontFamily:
+                                          'var(--font-montserrat), "Montserrat", "Istok Web", sans-serif',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      {buttonIcon}
+                                      <span className="relative z-10">
+                                        {buttonText}
+                                      </span>
+                                    </button>
+                                  )}
+                                  {isToday &&
+                                    isJoinEnabled &&
+                                    meeting.joinUrl && (
+                                      <a
+                                        href={meeting.joinUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`${buttonClass} ${buttonBg}`}
+                                        tabIndex={
+                                          !isSubscriptionActive ? -1 : 0
+                                        }
+                                        aria-disabled={!isSubscriptionActive}
+                                        onClick={(e) => {
+                                          if (!isSubscriptionActive)
+                                            e.preventDefault();
+                                        }}
+                                        style={{
+                                          pointerEvents: !isSubscriptionActive
+                                            ? 'none'
+                                            : undefined,
+                                          opacity: !isSubscriptionActive
+                                            ? 0.6
+                                            : 1,
+                                          fontFamily:
+                                            'var(--font-montserrat), "Montserrat", "Istok Web", sans-serif',
+                                        }}
+                                      >
+                                        <FaVideo className="size-4" />
+                                        <span className="relative z-10">
+                                          Unirse a la Clase
+                                        </span>
+                                      </a>
+                                    )}
+                                  {isToday &&
+                                    !isJoinEnabled &&
+                                    isMeetingEnded && (
+                                      <button
+                                        type="button"
+                                        className={`${buttonClass} ${buttonBg}`}
+                                        disabled={buttonDisabled}
+                                        style={{
+                                          fontFamily:
+                                            'var(--font-montserrat), "Montserrat", "Istok Web", sans-serif',
+                                        }}
+                                      >
+                                        {buttonIcon}
+                                        <span className="relative z-10">
+                                          {buttonText}
+                                        </span>
+                                      </button>
+                                    )}
+                                  {!isAvailable && !isNext && !isToday && (
                                     <button
                                       type="button"
                                       className={`${buttonClass} ${buttonBg}`}
@@ -1082,45 +1295,28 @@ export function CourseContent({
                                       </span>
                                     </button>
                                   )}
-                                {/* Botón para "Clase Bloqueada" (azul oscuro) */}
-                                {!isAvailable && !isNext && !isToday && (
-                                  <button
-                                    type="button"
-                                    className={`${buttonClass} ${buttonBg}`}
-                                    disabled={buttonDisabled}
-                                    style={{
-                                      fontFamily:
-                                        'var(--font-montserrat), "Montserrat", "Istok Web", sans-serif',
-                                    }}
-                                  >
-                                    {buttonIcon}
-                                    <span className="relative z-10">
-                                      {buttonText}
-                                    </span>
-                                  </button>
-                                )}
-                                {!isSubscriptionActive && (
-                                  <div className="mt-2 text-xs font-semibold text-red-600">
-                                    Debes tener una suscripción activa para
-                                    acceder a las clases en vivo.
-                                  </div>
-                                )}
-                              </>
-                            )}
+                                  {!isSubscriptionActive && (
+                                    <div className="mt-2 text-xs font-semibold text-red-600">
+                                      Debes tener una suscripción activa para
+                                      acceder a las clases en vivo.
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
                 </div>
               )}
 
               {/* Clases Grabadas - Sección con su propio toggle independiente */}
               {recordedMeetings.length > 0 && (
-                <div className="mb-6">
+                <div className="bg-background mb-6 rounded-lg border p-6 shadow-sm">
                   {/* Header with toggle button for recorded classes */}
-                  <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-white">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-white">
                       Clases Grabadas
                     </h3>
                     <button
@@ -1141,101 +1337,103 @@ export function CourseContent({
                   {/* Recorded classes content - only this gets hidden */}
                   <div
                     className={cn(
-                      'space-y-3 transition-all duration-300',
+                      'transition-all duration-300',
                       shouldBlurContent &&
                         'pointer-events-none opacity-100 blur-[2px]',
                       !showRecordedClasses && 'hidden' // Hide only recorded classes
                     )}
                   >
-                    {recordedMeetings.map((meeting: ClassMeeting) => {
-                      const isExpanded = expandedRecorded === meeting.id;
-                      const durationMinutes = getDurationMinutes(meeting);
-                      const currentProgress =
-                        meetingsProgress[meeting.id] ?? meeting.progress ?? 0;
+                    <div className="space-y-4">
+                      {recordedMeetings.map((meeting: ClassMeeting) => {
+                        const isExpanded = expandedRecorded === meeting.id;
+                        const durationMinutes = getDurationMinutes(meeting);
+                        const currentProgress =
+                          meetingsProgress[meeting.id] ?? meeting.progress ?? 0;
 
-                      return (
-                        <div
-                          key={meeting.id}
-                          className={`overflow-hidden rounded-lg border bg-gray-50 transition-colors hover:bg-gray-100`}
-                        >
-                          <button
-                            className="flex w-full items-center justify-between px-6 py-4"
-                            onClick={() => toggleRecorded(meeting.id)}
+                        return (
+                          <div
+                            key={meeting.id}
+                            className={`overflow-hidden rounded-lg border-0 bg-gray-800 text-white transition-colors hover:bg-gray-700`}
                           >
-                            <div className="flex w-full items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                <FaCheckCircle className="mr-2 size-5 text-green-500" />
-                                <span className="text-background font-medium">
-                                  {meeting.title}{' '}
-                                  <span className="ml-2 text-sm text-gray-500">
-                                    ({durationMinutes} mins)
-                                  </span>
-                                </span>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                {isExpanded ? (
-                                  <FaChevronUp className="text-gray-400" />
-                                ) : (
-                                  <FaChevronDown className="text-gray-400" />
-                                )}
-                              </div>
-                            </div>
-                          </button>
-                          {isExpanded && (
-                            <div className="border-t bg-white px-6 py-4">
-                              <p className="mb-4 text-gray-700">
-                                {
-                                  'Clase grabada disponible para repaso y consulta.'
-                                }
-                              </p>
-                              {/* Barra de progreso de la clase grabada (shadcn) */}
-                              <div className="mb-4">
-                                <div className="mb-2 flex items-center justify-between">
-                                  <p className="text-sm font-semibold text-gray-700">
-                                    Progreso De La Clase Grabada:
-                                  </p>
-                                  <span className="text-xs text-gray-500">
-                                    {currentProgress}%
+                            <button
+                              className="flex w-full items-center justify-between px-6 py-4"
+                              onClick={() => toggleRecorded(meeting.id)}
+                            >
+                              <div className="flex w-full items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  <FaCheckCircle className="mr-2 size-5 text-green-500" />
+                                  <span className="font-medium text-white">
+                                    {meeting.title}{' '}
+                                    <span className="ml-2 text-sm text-gray-300">
+                                      ({durationMinutes} mins)
+                                    </span>
                                   </span>
                                 </div>
-                                <Progress
-                                  value={currentProgress}
-                                  showPercentage={true}
-                                  className="transition-none"
-                                />
+                                <div className="flex items-center space-x-2">
+                                  {isExpanded ? (
+                                    <FaChevronUp className="text-gray-400" />
+                                  ) : (
+                                    <FaChevronDown className="text-gray-400" />
+                                  )}
+                                </div>
                               </div>
-                              {/* Botón para ver clase grabada, deshabilitado si no hay suscripción */}
-                              <button
-                                className={cn(
-                                  'buttonclass text-background transition-none active:scale-95',
-                                  !isSubscriptionActive &&
-                                    'pointer-events-none cursor-not-allowed opacity-60'
-                                )}
-                                onClick={() =>
-                                  isSubscriptionActive &&
-                                  handleOpenRecordedModal(meeting)
-                                }
-                                disabled={!isSubscriptionActive}
-                              >
-                                <div className="outline" />
-                                <div className="state state--default">
-                                  <div className="icon">
-                                    <FaVideo className="text-green-600" />
+                            </button>
+                            {isExpanded && (
+                              <div className="border-t border-gray-700 bg-gray-900 px-6 py-4">
+                                <p className="mb-4 text-gray-300">
+                                  {
+                                    'Clase grabada disponible para repaso y consulta.'
+                                  }
+                                </p>
+                                {/* Barra de progreso de la clase grabada (shadcn) */}
+                                <div className="mb-4">
+                                  <div className="mb-2 flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-gray-300">
+                                      Progreso De La Clase Grabada:
+                                    </p>
+                                    <span className="text-xs text-gray-400">
+                                      {currentProgress}%
+                                    </span>
                                   </div>
-                                  <span>Clase Grabada</span>
+                                  <Progress
+                                    value={currentProgress}
+                                    showPercentage={true}
+                                    className="transition-none"
+                                  />
                                 </div>
-                              </button>
-                              {!isSubscriptionActive && (
-                                <div className="mt-2 text-xs font-semibold text-red-600">
-                                  Debes tener una suscripción activa para ver la
-                                  clase grabada.
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                                {/* Botón para ver clase grabada, deshabilitado si no hay suscripción */}
+                                <button
+                                  className={cn(
+                                    'buttonclass text-black transition-none active:scale-95',
+                                    !isSubscriptionActive &&
+                                      'pointer-events-none cursor-not-allowed opacity-60'
+                                  )}
+                                  onClick={() =>
+                                    isSubscriptionActive &&
+                                    handleOpenRecordedModal(meeting)
+                                  }
+                                  disabled={!isSubscriptionActive}
+                                >
+                                  <div className="outline" />
+                                  <div className="state state--default">
+                                    <div className="icon">
+                                      <FaVideo className="text-green-600" />
+                                    </div>
+                                    <span>Clase Grabada</span>
+                                  </div>
+                                </button>
+                                {!isSubscriptionActive && (
+                                  <div className="mt-2 text-xs font-semibold text-red-600">
+                                    Debes tener una suscripción activa para ver
+                                    la clase grabada.
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1245,11 +1443,9 @@ export function CourseContent({
       )}
 
       {/* Regular lessons - Now with white container */}
-      <div className="mb-8 rounded-lg border bg-white p-6 shadow-sm">
+      <div className="bg-background mb-8 rounded-lg border p-6 shadow-sm">
         {/* Increased padding from p-4 to p-6 */}
-        <h2 className="text-background mb-4 text-xl font-bold">
-          Clases del curso
-        </h2>
+        <h2 className="mb-4 text-xl font-bold text-white">Clases del curso</h2>
         <div
           className={cn(
             'transition-all duration-300',

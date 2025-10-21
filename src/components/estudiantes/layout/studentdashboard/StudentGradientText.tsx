@@ -13,7 +13,7 @@ interface GradientTextProps {
 export default function StudentGradientText({
   children,
   className = '',
-  colors = ['#2ecc71', '#3AF4EF', '#00BDD8'],
+  colors = ['#01142B', '#003366', '#005580'], // colores oscuros
   animationSpeed = 3,
   showBorder = false,
 }: GradientTextProps) {

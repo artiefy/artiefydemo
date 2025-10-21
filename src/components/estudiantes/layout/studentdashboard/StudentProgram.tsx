@@ -63,7 +63,7 @@ export function StudentProgram({ program }: StudenProgramProps) {
             <div className="flex items-center space-x-4">
               <Badge
                 variant="outline"
-                className="border-primary bg-background text-xs sm:text-sm"
+                className="border-none bg-[#01142B] text-xs text-white sm:text-sm"
               >
                 {program.category?.name ?? 'Sin categoría'}
               </Badge>

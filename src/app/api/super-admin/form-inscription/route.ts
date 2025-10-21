@@ -13,12 +13,12 @@ import {
   dates,
   enrollmentPrograms,
   horario,
+pagos,
   programas,
   sede,
   userCredentials,
   userInscriptionDetails,
-  users,
-} from '~/server/db/schema';
+  users} from '~/server/db/schema';
 import { createUser } from '~/server/queries/queries';
 
 export const runtime = 'nodejs'; // asegurar Node runtime (Buffer/S3)
@@ -284,8 +284,11 @@ async function uploadToS3(file: File | null, prefix: string) {
    Validación (Zod)
    ========================= */
 const fieldsSchema = z.object({
-  nombres: z.string().min(1),
-  apellidos: z.string().min(1),
+  primerNombre: z.string().min(1),
+  segundoNombre: z.string().optional().default(''),
+  primerApellido: z.string().min(1),
+  segundoApellido: z.string().optional().default(''),
+
   identificacionTipo: z.string().min(1),
   identificacionNumero: z.string().min(1),
   email: z.string().email(),
@@ -293,7 +296,7 @@ const fieldsSchema = z.object({
   pais: z.string().min(1),
   ciudad: z.string().min(1),
   telefono: z.string().min(1),
-  birthDate: z.string().optional().default(''), // YYYY-MM-DD o ''
+  birthDate: z.string().optional().default(''),
   fecha: z.string().optional().default(''),
   nivelEducacion: z.string().min(1),
   tieneAcudiente: z.string().optional().default(''),
@@ -301,7 +304,7 @@ const fieldsSchema = z.object({
   acudienteContacto: z.string().optional().default(''),
   acudienteEmail: z.string().optional().default(''),
   programa: z.string().min(1),
-  fechaInicio: z.string().min(1), // yyyy-mm-dd (string)
+  fechaInicio: z.string().min(1),
   comercial: z.string().optional().default(''),
   sede: z.string().min(1),
   horario: z.string().min(1),
@@ -310,6 +313,7 @@ const fieldsSchema = z.object({
   modalidad: z.string().min(1),
   numeroCuotas: z.string().min(1),
 });
+
 
 /* =========================
    POST: crea en Clerk, guarda en BD y matrícula al programa
@@ -339,87 +343,117 @@ export async function POST(req: Request) {
       'comprobanteInscripcion'
     ) as File | null;
 
-    const fullName = `${fields.nombres} ${fields.apellidos}`.trim();
-    const role = 'estudiante' as const;
+
 
     // 1) Crear SIEMPRE usuario en Clerk (para garantizar que usamos su id)
     console.time('[1] createUser (Clerk)');
-    const created = await createUser(
-      fields.nombres,
-      fields.apellidos,
-      fields.email,
-      role
-    );
-    console.timeEnd('[1] createUser (Clerk)');
-    if (!created) {
-      console.error('[CLERK] No se pudo crear el usuario');
-      return NextResponse.json(
-        { error: 'No se pudo crear el usuario en Clerk' },
-        { status: 400 }
-      );
-    }
-    // Calcular fecha fin (ahora + 1 mes)
-    const subscriptionEndDate = new Date();
-    subscriptionEndDate.setMonth(subscriptionEndDate.getMonth() + 1);
+// === Nombres normalizados para Clerk y BD ===
+const firstNameClerk = [fields.primerNombre, fields.segundoNombre]
+  .filter(Boolean)
+  .join(' ')
+  .trim();
 
-    // Formato "YYYY-MM-DD HH:mm:ss"
-    const formattedEndDate = subscriptionEndDate
-      .toISOString()
-      .slice(0, 19)
-      .replace('T', ' ');
+const lastNameClerk = [fields.primerApellido, fields.segundoApellido]
+  .filter(Boolean)
+  .join(' ')
+  .trim();
+
+// Nombre completo para BD (columna `name`)
+const fullName = [firstNameClerk, lastNameClerk]
+  .filter(Boolean)
+  .join(' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+// Rol en el scope
+const role = 'estudiante' as const;
+
+// === Suscripción (la necesitas para formattedEndDate ANTES de createUser) ===
+const subscriptionEndDate = new Date();
+subscriptionEndDate.setMonth(subscriptionEndDate.getMonth() + 1);
+
+// Formato "YYYY-MM-DD HH:mm:ss" (si tu createUser lo usa como string)
+const formattedEndDate = subscriptionEndDate
+  .toISOString()
+  .slice(0, 19)
+  .replace('T', ' ');
+
+
+// Asegura rol en el scope
+
+// 1) Crear SIEMPRE usuario en Clerk (para garantizar que usamos su id)
+console.time('[1] createUser (Clerk)');
+
+const created = await createUser(
+  firstNameClerk,         // concatenado
+  lastNameClerk,          // concatenado
+  fields.email,
+  role,                   // 'estudiante'
+  'active',               // opcional
+  formattedEndDate        // opcional: tu firma admite endDate string
+);
+
+console.timeEnd('[1] createUser (Clerk)');
+
+if (!created) {
+  console.error('[CLERK] No se pudo crear el usuario');
+  return NextResponse.json(
+    { error: 'No se pudo crear el usuario en Clerk' },
+    { status: 400 }
+  );
+}
+
+const userId = created.user.id;
+const generatedPassword = created.generatedPassword ?? null;
+const usernameForEmail = created.user.username ?? fields.primerNombre;
+
+
 
     const client = await clerkClient();
-    await client.users.updateUser(created.user.id, {
-      publicMetadata: {
-        planType: 'Premium',
-        subscriptionStatus: 'active',
-        subscriptionEndDate: formattedEndDate,
-      },
-    });
-    const userId = created.user.id; // <- id de Clerk (OBLIGATORIO en tus tablas)
-    const generatedPassword = created.generatedPassword ?? null;
-    const usernameForEmail = created.user.username ?? fields.nombres;
-    console.log('[CLERK] Usuario creado:', {
-      clerkId: userId,
-      email: fields.email,
-    });
+await client.users.updateUser(created.user.id, {
+  firstName: firstNameClerk,   // p.ej. "Luis Miguel"
+  lastName:  lastNameClerk,    // p.ej. "García Márquez"
+  publicMetadata: {
+    planType: 'Premium',
+    subscriptionStatus: 'active',
+    subscriptionEndDate: formattedEndDate
+  },
+});
 
-    // 2) USERS: ensure row (insert si no existe) y luego update por id
-    console.log(
-      '[USERS UPSERT] userId:',
-      userId,
-      'birthDate:',
-      fields.birthDate || null
-    );
-    await db
-      .insert(users)
-      .values({
-        id: userId,
-        role,
-        name: fullName,
-        email: fields.email,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .onConflictDoNothing(); // evita violar PK si se reintenta
+    // Calcular fecha fin (ahora + 1 mes)
 
-    await db
-      .update(users)
-      .set({
-        role,
-        name: fullName,
-        email: fields.email,
-        phone: fields.telefono,
-        address: fields.direccion,
-        country: fields.pais,
-        city: fields.ciudad,
-        birthDate:
-          fields.birthDate && fields.birthDate.trim() !== ''
-            ? fields.birthDate
-            : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId));
+await db.insert(users).values({
+  id: userId,
+  role,
+  name: fullName,                 // 👈 concatenado
+  email: fields.email,
+  subscriptionEndDate,            // Date está bien para timestamp (mode: 'date')
+  planType: 'Premium',
+  subscriptionStatus: 'activo',
+  createdAt: new Date(),
+  updatedAt: new Date(),
+}).onConflictDoNothing();
+
+
+await db.update(users).set({
+  role,
+  name: fullName, // 👈 concatenado
+  email: fields.email,
+  phone: fields.telefono,
+  address: fields.direccion,
+  country: fields.pais,
+  city: fields.ciudad,
+  birthDate: fields.birthDate?.trim()
+    ? new Date(fields.birthDate).toISOString().split('T')[0]
+    : null, // tu columna es date()
+  subscriptionEndDate,
+  planType: 'Premium',
+  subscriptionStatus: 'activo',
+  updatedAt: new Date(),
+}).where(eq(users.id, userId));
+
+
+
 
     // 3) user_credentials: upsert manual (sin tocar schema)
     if (generatedPassword !== null) {
@@ -581,6 +615,86 @@ export async function POST(req: Request) {
         notifyErr
       );
     }
+
+// ... después de enviar notificaciones y todo
+// Solo registrar el pago si el usuario indicó que ya pagó la inscripción
+console.log('[PAGO] valor de fields.pagoInscripcion =>', fields.pagoInscripcion);
+const pagoInscripcionEsSi = /^s[ií]$/i.test(fields.pagoInscripcion || '');
+console.log('[PAGO] ¿pagoInscripcionEsSi? =>', pagoInscripcionEsSi);
+
+// Debug del comprobante
+console.log('[PAGO] Comprobante (S3):', {
+  comprobanteInscripcionKey,
+  comprobanteInscripcionUrl,
+  hasFile: !!comprobanteInscripcion,
+  fileName: comprobanteInscripcion?.name ?? null,
+  fileType: comprobanteInscripcion?.type ?? null,
+  fileSize: comprobanteInscripcion?.size ?? null,
+});
+
+if (pagoInscripcionEsSi) {
+  try {
+    const hoy = new Date();
+    const fechaStr = hoy.toISOString().split('T')[0]; // "YYYY-MM-DD"
+
+    const payload = {
+      userId,
+      programaId: programRow.id,
+      concepto: 'Cuota 1',        // o 'Inscripción' si prefieres
+      nroPago: 1,
+      fecha: fechaStr,
+      metodo: 'Artiefy',
+      valor: 150000,
+      createdAt: hoy,
+
+      // Comprobante subido a S3
+      receiptKey: comprobanteInscripcionKey ?? null,
+      receiptUrl: comprobanteInscripcionUrl ?? null,
+      receiptName: comprobanteInscripcion?.name ?? null,
+      receiptUploadedAt: hoy,
+    };
+
+    console.log('[PAGO] Insert payload =>', payload);
+
+    const inserted = await db
+      .insert(pagos)
+      .values(payload)
+      .returning({
+        id: pagos.id,
+        userId: pagos.userId,
+        programaId: pagos.programaId,
+        concepto: pagos.concepto,
+        nroPago: pagos.nroPago,
+        fecha: pagos.fecha,
+        metodo: pagos.metodo,
+        valor: pagos.valor,
+        receiptKey: pagos.receiptKey,
+        receiptUrl: pagos.receiptUrl,
+        createdAt: pagos.createdAt,
+      });
+
+    console.log('[PAGO] Resultado de INSERT (returning):');
+    console.table(inserted);
+
+    if (inserted?.length) {
+      console.log(
+        `[PAGO OK] id=${inserted[0].id} registrado para userId=${userId}, programaId=${programRow.id}`
+      );
+    } else {
+      console.warn('[PAGO] INSERT no devolvió filas (returning vacío).');
+    }
+  } catch (pagoErr) {
+    console.error('❌ Error creando pago automático:', pagoErr);
+  }
+} else {
+  console.log(
+    '[PAGO] No se registra pago porque pagoInscripcion ≠ "Sí". Valor:',
+    fields.pagoInscripcion
+  );
+}
+
+console.log('==== [FORM SUBMIT] FIN OK ====');
+
 
     console.log('==== [FORM SUBMIT] FIN OK ====');
     return NextResponse.json({

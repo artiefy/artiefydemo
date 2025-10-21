@@ -12,12 +12,28 @@ import { toast } from 'sonner';
 import { LoadingCourses } from '~/app/dashboard/educadores/(inicio)/cursos/page';
 import DashboardEstudiantes from '~/components/educators/layout/DashboardEstudiantes';
 import LessonsListEducator from '~/components/educators/layout/LessonsListEducator'; // Importar el componente
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '~/components/educators/ui/alert-dialog';
 import { Badge } from '~/components/educators/ui/badge';
 import { Button } from '~/components/educators/ui/button';
 import { Card, CardHeader, CardTitle } from '~/components/educators/ui/card';
 import { Label } from '~/components/educators/ui/label';
 import TechLoader from '~/components/estudiantes/ui/tech-loader';
+import { ScheduledMeetingsList } from '~/components/super-admin/layout/ScheduledMeetingsList';
 import ModalFormCourse from '~/components/super-admin/modals/ModalFormCourse';
+import {
+  ModalScheduleMeeting,
+  ScheduledMeeting,
+} from '~/components/super-admin/modals/ModalScheduleMeeting';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -47,6 +63,7 @@ interface Course {
   coverVideoCourseKey?: string;
   individualPrice?: number | null;
   courseTypes?: { id: number; name: string }[]; // <== añades esto
+  meetings?: ScheduledMeeting[];
 }
 interface Materia {
   id: number;
@@ -66,6 +83,16 @@ export interface Parametros {
   porcentaje: number;
   courseId: number;
 }
+
+type UIMeeting = ScheduledMeeting & {
+  id: number;
+  meetingId: string;
+  // Usa undefined (no null) para alinear con ModalScheduleMeeting.tsx
+  joinUrl?: string;
+  recordingContentUrl?: string;
+  videoUrl?: string;
+  video_key?: string;
+};
 
 // Add these interfaces after the existing interfaces
 interface Educator {
@@ -146,6 +173,189 @@ const FullscreenLoader = () => {
   );
 };
 
+interface VideoIdxItem {
+  meetingId: string;
+  videoKey: string;
+  videoUrl: string;
+  createdAt?: string;
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+
+function isVideoIdxItem(v: unknown): v is VideoIdxItem {
+  if (!isRecord(v)) return false;
+  return (
+    typeof v.meetingId === 'string' &&
+    typeof v.videoKey === 'string' &&
+    typeof v.videoUrl === 'string' &&
+    (typeof v.createdAt === 'string' || typeof v.createdAt === 'undefined')
+  );
+}
+
+// Tipo auxiliar con las props que necesitamos leer de forma segura
+type MaybeMeeting = Partial<
+  Pick<
+    UIMeeting,
+    | 'id'
+    | 'meetingId'
+    | 'joinUrl'
+    | 'recordingContentUrl'
+    | 'video_key'
+    | 'videoUrl'
+  >
+> &
+  Record<string, unknown>;
+
+function toUIMeeting(m: ScheduledMeeting): UIMeeting {
+  const obj: MaybeMeeting = isRecord(m)
+    ? (m as MaybeMeeting)
+    : ({} as MaybeMeeting);
+
+  const id = typeof obj.id === 'number' ? obj.id : 0;
+  const meetingId = typeof obj.meetingId === 'string' ? obj.meetingId : '';
+
+  // Todas como string | undefined (NO null)
+  const joinUrl = typeof obj.joinUrl === 'string' ? obj.joinUrl : undefined;
+  const recordingContentUrl =
+    typeof obj.recordingContentUrl === 'string'
+      ? obj.recordingContentUrl
+      : undefined;
+  const video_key =
+    typeof obj.video_key === 'string' ? obj.video_key : undefined;
+  const videoUrlRaw =
+    typeof obj.videoUrl === 'string' ? obj.videoUrl : undefined;
+
+  const aws = (process.env.NEXT_PUBLIC_AWS_S3_URL ?? '').replace(/\/+$/, '');
+  const { url: finalVideoUrl, source } = resolveVideo(
+    { video_key, videoUrl: videoUrlRaw, recordingContentUrl },
+    aws
+  );
+
+  // 🐞 log detallado por ítem
+  console.log('🎥 resolveVideo()', {
+    id,
+    meetingId,
+    video_key,
+    videoUrlRaw,
+    recordingContentUrl,
+    finalVideoUrl,
+    source,
+  });
+
+  return {
+    ...(m as ScheduledMeeting),
+    id,
+    meetingId,
+    joinUrl,
+    recordingContentUrl,
+    video_key,
+    videoUrl: finalVideoUrl,
+  };
+}
+
+type VideoSource = 'S3_BY_KEY' | 'EXPLICIT_URL' | 'GRAPH_TEMP' | 'NONE';
+
+function resolveVideo(
+  m: {
+    video_key?: string;
+    videoUrl?: string;
+    recordingContentUrl?: string;
+  },
+  awsBase: string
+): { url?: string; source: VideoSource } {
+  const aws = (awsBase ?? '').replace(/\/+$/, '');
+
+  // 1) Preferimos S3 (estable)
+  if (m.video_key && m.video_key.trim() !== '') {
+    return {
+      url: `${aws}/video_clase/${m.video_key.trim()}`,
+      source: 'S3_BY_KEY',
+    };
+  }
+
+  // 2) URL explícita válida
+  if (typeof m.videoUrl === 'string') {
+    const v = m.videoUrl.trim();
+    if (v && !/^(null|undefined)$/i.test(v)) {
+      try {
+        const u = new URL(v);
+        if (u.protocol === 'http:' || u.protocol === 'https:') {
+          return { url: v, source: 'EXPLICIT_URL' };
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  // 3) Fallback Graph temporal
+  if (typeof m.recordingContentUrl === 'string') {
+    const r = m.recordingContentUrl.trim();
+    if (r && !/^(null|undefined)$/i.test(r)) {
+      return { url: r, source: 'GRAPH_TEMP' };
+    }
+  }
+
+  return { url: undefined, source: 'NONE' };
+}
+
+function logAssignments(meetings: UIMeeting[]) {
+  try {
+    console.table(
+      meetings.map((m) => ({
+        id: m.id,
+        meetingId: m.meetingId,
+        start: String(
+          (m as unknown as { startDateTime: string }).startDateTime
+        ),
+        hasVideoKey: Boolean(m.video_key),
+        hasVideoUrl: Boolean(m.videoUrl),
+        video_key: m.video_key ?? '',
+        videoUrl: m.videoUrl ?? '',
+      }))
+    );
+  } catch {
+    // ignore
+  }
+}
+
+function getMeetingIdFrom(m: ScheduledMeeting): string {
+  const obj = m as unknown as MaybeMeeting;
+
+  // 1) Si ya viene como campo
+  if (typeof obj.meetingId === 'string' && obj.meetingId.trim() !== '') {
+    return obj.meetingId.trim();
+  }
+
+  // 2) Varios patrones comunes en joinUrl
+  const ju = typeof obj.joinUrl === 'string' ? obj.joinUrl : '';
+  if (!ju) return '';
+
+  try {
+    const dec = decodeURIComponent(ju);
+
+    // a) id de evento online meeting (clásico)
+    const m1 = /19:meeting_[^@]+@thread\.v2/.exec(dec);
+    if (m1?.[0]) return m1[0];
+
+    // b) query param meetingId=...
+    const u = new URL(ju);
+    const q = u.searchParams.get('meetingId');
+    const qTrim = q?.trim();
+    if (qTrim) return qTrim;
+
+    // c) paths alternos (algunas orgs)
+    const m3 = /\/meet\/([A-Za-z0-9:_\-@.]+)/.exec(dec);
+    if (m3?.[1]) return m3[1];
+
+    return '';
+  } catch {
+    return '';
+  }
+}
+
 const CourseDetail: React.FC<CourseDetailProps> = () => {
   const router = useRouter(); // Obtener el router
   const params = useParams(); // Obtener los parámetros
@@ -212,6 +422,25 @@ const CourseDetail: React.FC<CourseDetailProps> = () => {
 
   // Agregar este nuevo estado
   const [currentSubjects, setCurrentSubjects] = useState<{ id: number }[]>([]);
+
+  const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
+  const [scheduledMeetings, setScheduledMeetings] = useState<
+    ScheduledMeeting[]
+  >([]);
+  // índice de videos por meetingId
+  const [videosByMeetingId, setVideosByMeetingId] = useState<
+    Map<string, { videoKey: string; videoUrl: string; createdAt?: string }>
+  >(new Map());
+  // Lista completa de videos para asignación por fecha (no colapsada por meetingId)
+  const [videosRaw, setVideosRaw] = useState<
+    {
+      meetingId: string;
+      videoKey: string;
+      videoUrl: string;
+      createdAt?: string;
+    }[]
+  >([]);
+  void videosByMeetingId;
 
   const { user } = useUser(); // Ya está dentro del componente
 
@@ -302,26 +531,23 @@ const CourseDetail: React.FC<CourseDetailProps> = () => {
             (await responseParametros.json()) as Parametros[]; // Obtener los parámetros
           setParametros(dataParametros); // Inicializar los parámetros
         } else {
-          // Valor inicial del mensaje de error por defecto
           let errorMessage = response.statusText;
 
-          try {
-            // Intentamos extraer mensaje de error del JSON si existe
-            const errorJson: unknown = await response.json();
+          // Intentamos parsear el cuerpo de la respuesta como JSON
+          const errorResponseRaw: unknown = await response
+            .json()
+            .catch(() => null);
 
-            if (
-              typeof errorJson === 'object' &&
-              errorJson !== null &&
-              'error' in errorJson &&
-              typeof (errorJson as { error?: string }).error === 'string'
-            ) {
-              errorMessage = (errorJson as { error: string }).error;
-            }
-          } catch {
-            // Si la respuesta no tiene JSON válido o no contiene 'error', ignoramos
+          if (
+            errorResponseRaw &&
+            typeof errorResponseRaw === 'object' &&
+            'error' in errorResponseRaw &&
+            typeof (errorResponseRaw as { error: unknown }).error === 'string'
+          ) {
+            errorMessage = (errorResponseRaw as { error: string }).error;
           }
 
-          // Guardamos el error en el estado y mostramos el toast
+          // Guardar en estado y mostrar toast con mensaje claro
           setError(`Error al cargar el curso: ${errorMessage}`);
           toast('Error', {
             description: `No se pudo cargar el curso: ${errorMessage}`,
@@ -371,6 +597,73 @@ const CourseDetail: React.FC<CourseDetailProps> = () => {
     void fetchEducators(); // Use void operator to explicitly ignore the promise
   }, []);
 
+  useEffect(() => {
+    // ⚠️ Usa el AAD userId del organizador (GUID). Este es el que aparece en tus logs.
+    const organizerAadUserId = '0843f2fa-3e0b-493f-8bb9-84b0aa1b2417';
+
+    if (!organizerAadUserId) return;
+
+    const run = async () => {
+      try {
+        console.log('🎥 Haciendo fetch de videos...');
+        const res = await fetch(
+          `/api/super-admin/teams/video?userId=${organizerAadUserId}`
+        );
+        console.log(
+          '🛰️ /teams/video status: ',
+          res.status,
+          'url usada:',
+          res.url
+        );
+
+        if (!res.ok) return;
+
+        interface VideoIdxItem {
+          meetingId: string;
+          videoKey: string;
+          videoUrl: string;
+          createdAt?: string;
+        }
+
+        const raw = (await res.json()) as unknown;
+
+        const videos: VideoIdxItem[] =
+          isRecord(raw) &&
+          Array.isArray((raw as Record<string, unknown>).videos)
+            ? ((raw as Record<string, unknown>).videos as unknown[]).filter(
+                isVideoIdxItem
+              )
+            : [];
+
+        setVideosRaw(videos); // ← guardamos la lista completa para el emparejamiento 1:1 por fecha
+
+        console.log('🎬 Lista de videos extraída:', videos);
+
+        // construir índice meetingId -> video más reciente (por si acaso)
+        const map = new Map<
+          string,
+          { videoKey: string; videoUrl: string; createdAt?: string }
+        >();
+        for (const v of videos) {
+          const prev = map.get(v.meetingId);
+          if (!prev) {
+            map.set(v.meetingId, v);
+          } else {
+            const pt = prev.createdAt ? new Date(prev.createdAt).getTime() : 0;
+            const ct = v.createdAt ? new Date(v.createdAt).getTime() : 0;
+            if (ct >= pt) map.set(v.meetingId, v);
+          }
+        }
+
+        setVideosByMeetingId(map);
+      } catch (e) {
+        console.error('❌ Error fetch /teams/video:', e);
+      }
+    };
+
+    void run();
+  }, []); // solo una vez
+
   // Obtener el color seleccionado al cargar la página
   useEffect(() => {
     const savedColor = localStorage.getItem(`selectedColor_${courseIdNumber}`);
@@ -378,6 +671,11 @@ const CourseDetail: React.FC<CourseDetailProps> = () => {
       setSelectedColor(savedColor);
     }
   }, [courseIdNumber]);
+  useEffect(() => {
+    if (course?.meetings) {
+      setScheduledMeetings(course.meetings);
+    }
+  }, [course?.meetings]);
 
   // Manejo de actualizar
   const handleUpdateCourse = async (
@@ -625,7 +923,51 @@ const CourseDetail: React.FC<CourseDetailProps> = () => {
   // Verificar si hay un error o hay curso
   if (!course) return <div>No se encontró el curso.</div>;
 
- 
+  // Función para manejar la eliminación del curso
+  const handleDelete = async () => {
+    if (!course) return;
+    try {
+      // Primero intentamos eliminar la imagen de S3
+      if (course.coverImageKey) {
+        const responseAws = await fetch('/api/upload', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            key: course.coverImageKey,
+          }),
+        });
+
+        if (!responseAws.ok) {
+          console.error('Error al eliminar la imagen de S3');
+        }
+      }
+
+      // Luego eliminamos el curso
+      const response = await fetch(
+        `/api/educadores/courses?courseId=${course.id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Error al eliminar el curso`);
+      }
+
+      toast('Curso eliminado', {
+        description: 'El curso se ha eliminado con éxito.',
+      });
+      router.push('/dashboard/super-admin/cursos');
+    } catch (error) {
+      console.error('Error:', error);
+      toast('Error', {
+        description: 'No se pudo eliminar el curso completamente',
+      });
+    }
+  };
+
   // Verificar si hay un error
   if (error) {
     return (
@@ -704,6 +1046,106 @@ const CourseDetail: React.FC<CourseDetailProps> = () => {
   if (isUpdating) {
     return <FullscreenLoader />;
   }
+
+  // Base de reuniones (las del estado si existen; si no, las del curso)
+  const baseMeetings = scheduledMeetings.length
+    ? scheduledMeetings
+    : (course.meetings ?? []);
+
+  // Convierte string de fecha a ms. Si no trae zona, asumimos Bogotá -05:00
+  const toMs = (s: string) => {
+    const hasTZ = /Z$|[+-]\d{2}:\d{2}$/.test(s);
+    const final = hasTZ ? s : `${s}-05:00`;
+    return new Date(final).getTime();
+  };
+
+  // Normalizamos ocurrencias y “limpiamos” cualquier video heredado
+  const occs: UIMeeting[] = baseMeetings.map((m) => {
+    const ui = toUIMeeting(m);
+    const mId = getMeetingIdFrom(m);
+
+    return {
+      ...ui,
+      meetingId: mId,
+      video_key: undefined,
+      videoUrl: undefined,
+      recordingContentUrl: undefined,
+    };
+  });
+
+  // --- NUEVO MATCHER: asigna cada video a una sola ocurrencia --- //
+  // 1) Preparamos índices útiles
+  const OCC_TIME: number[] = occs.map((o) =>
+    toMs(String((o as unknown as { startDateTime: string }).startDateTime))
+  );
+
+  // 2) Ordenamos videos por fecha (viejo→nuevo) para estabilizar
+  const videosSorted = [...videosRaw].sort((a, b) => {
+    const am = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bm = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return am - bm;
+  });
+
+  // Ventana de tolerancia (p.ej. ±12h)
+  const WINDOW_MS = 12 * 60 * 60 * 1000;
+
+  // Marca de “ya usado”
+  const usedOcc: boolean[] = occs.map(() => false);
+
+  // 3) Asignamos
+  for (const v of videosSorted) {
+    const vMs = v.createdAt ? new Date(v.createdAt).getTime() : NaN;
+    if (Number.isNaN(vMs)) continue;
+
+    // candidatos por meetingId (si viene)
+    const candidatesIdx = occs
+      .map((_o, idx) => idx)
+      .filter((idx) =>
+        v.meetingId ? occs[idx].meetingId === v.meetingId : true
+      );
+
+    let bestIdx = -1;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    for (const idx of candidatesIdx) {
+      if (usedOcc[idx]) continue; // ya tiene video
+
+      const diff = Math.abs(OCC_TIME[idx] - vMs);
+      if (diff <= WINDOW_MS && diff < bestScore) {
+        bestScore = diff;
+        bestIdx = idx;
+      }
+    }
+
+    if (bestIdx >= 0) {
+      occs[bestIdx].video_key = v.videoKey;
+      occs[bestIdx].videoUrl = v.videoUrl;
+      usedOcc[bestIdx] = true;
+    }
+  }
+
+  const mergedMeetings: UIMeeting[] = occs;
+
+  logAssignments(mergedMeetings);
+
+  // (Opcional) Log compacto para verificar asignaciones
+  console.table(
+    mergedMeetings.map((m) => ({
+      id: m.id,
+      meetingId: m.meetingId,
+      video_key: m.video_key,
+      videoUrl: m.videoUrl,
+    }))
+  );
+
+  console.table(
+    mergedMeetings.map((m) => ({
+      id: m.id,
+      meetingId: m.meetingId,
+      video_key: m.video_key,
+      videoUrl: m.videoUrl,
+    }))
+  );
 
   // Renderizar el componente
   return (
@@ -806,6 +1248,31 @@ const CourseDetail: React.FC<CourseDetailProps> = () => {
                     Estadisticas
                   </Link>
                 </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive">Eliminar</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta acción no se puede deshacer. Se eliminará
+                        permanentemente el curso
+                        <span className="font-bold"> {course.title}</span> y
+                        todos los datos asociados a este.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDelete()}
+                        className="border-red-600 bg-red-600 text-white hover:border-red-700 hover:bg-transparent hover:text-red-700"
+                      >
+                        Eliminar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
             {/* Right Column - Information */}
@@ -883,7 +1350,7 @@ const CourseDetail: React.FC<CourseDetailProps> = () => {
                       selectedColor === '#FFFFFF' ? 'text-black' : 'text-white'
                     }`}
                   >
-                    Educador:
+                    educador:
                   </h2>
                   <div className="flex flex-col gap-2">
                     <select
@@ -1032,6 +1499,24 @@ const CourseDetail: React.FC<CourseDetailProps> = () => {
       ) : (
         courseIdNumber !== null && (
           <>
+            {/* NUEVO BLOQUE PARA SIMULAR CLASES EN TEAMS */}
+            <div className="mt-12 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-primary text-xl font-bold">
+                  Clases agendadas
+                </h2>
+                <Button
+                  onClick={() => setIsMeetingModalOpen(true)}
+                  className="bg-primary hover:bg-primary/90 text-black"
+                >
+                  + Agendar clase en Teams
+                </Button>
+              </div>
+              <ScheduledMeetingsList
+                meetings={mergedMeetings}
+                color={selectedColor}
+              />
+            </div>
             <LessonsListEducator
               courseId={courseIdNumber}
               selectedColor={selectedColor}
@@ -1039,6 +1524,17 @@ const CourseDetail: React.FC<CourseDetailProps> = () => {
           </>
         )
       )}
+
+      <ModalScheduleMeeting
+        isOpen={isMeetingModalOpen}
+        onClose={() => setIsMeetingModalOpen(false)}
+        onMeetingsCreated={() => {
+          setIsMeetingModalOpen(false);
+          fetchCourse(); // 🔄 vuelve a traer el curso con los meetings desde backend
+        }}
+        courseId={courseIdNumber} // <-- aquí lo pasas
+      />
+
       <DashboardEstudiantes
         courseId={courseIdNumber}
         selectedColor={selectedColor}

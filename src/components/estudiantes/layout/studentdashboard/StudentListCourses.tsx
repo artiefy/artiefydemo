@@ -604,7 +604,7 @@ export default async function StudentListCourses({
                   <div className="flex items-center justify-between">
                     <Badge
                       variant="outline"
-                      className="border-primary bg-background text-primary hover:bg-black/70"
+                      className="border-none bg-[#01142B] text-white hover:bg-gray-800"
                     >
                       {course.category?.name}
                     </Badge>
@@ -689,7 +689,7 @@ export default async function StudentListCourses({
                       className={`group/button relative inline-flex h-10 w-full items-center justify-center overflow-hidden rounded-md border border-white/20 p-2 ${
                         !course.isActive
                           ? 'pointer-events-none bg-gray-600 text-white'
-                          : 'bg-background text-primary active:scale-95'
+                          : 'bg-[#01142B] text-white active:scale-95'
                       }`}
                     >
                       <span className="font-bold">

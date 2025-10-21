@@ -17,7 +17,7 @@ const badgeVariants = cva(
         destructive:
           'border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40',
         outline:
-          'text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
+          'bg-[#01142B] text-white border-2 border-white [a&]:hover:bg-gray-800 [a&]:hover:text-white',
       },
     },
     defaultVariants: {
@@ -35,10 +35,15 @@ function Badge({
   VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : 'span';
 
+  // Aplica el borde blanco solo si es outline
+  const style =
+    variant === 'outline' ? { border: '1px solid #fff' } : undefined;
+
   return (
     <Comp
       data-slot="badge"
       className={cn(badgeVariants({ variant }), className)}
+      style={style}
       {...props}
     />
   );

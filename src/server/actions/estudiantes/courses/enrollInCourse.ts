@@ -19,7 +19,11 @@ import type { EnrollmentResponse } from '~/types';
 export async function enrollInCourse(
   courseId: number
 ): Promise<EnrollmentResponse> {
-  let course = null;
+  let course:
+    | (typeof courses.$inferSelect & {
+        courseType?: { requiredSubscriptionLevel?: string } | null;
+      })
+    | null = null;
 
   try {
     const user = await currentUser();
@@ -34,12 +38,13 @@ export async function enrollInCourse(
     const userId = user.id;
 
     // Get course information first
-    course = await db.query.courses.findFirst({
+    const foundCourse = await db.query.courses.findFirst({
       where: eq(courses.id, courseId),
       with: {
         courseType: true,
       },
     });
+    course = foundCourse ?? null;
 
     if (!course) {
       return { success: false, message: 'Curso no encontrado' };
@@ -171,7 +176,7 @@ export async function enrollInCourse(
     });
 
     // Sort lessons using our shared sorting utility
-    const sortedLessons = sortLessons(courseLessons);
+    const sortedLessons = sortLessons(courseLessons); // sortLessons usa orderIndex
 
     // Obtén los IDs de las lecciones que ya tienen progreso
     const existingProgress = await db.query.userLessonsProgress.findMany({
@@ -198,6 +203,9 @@ export async function enrollInCourse(
         db.insert(userLessonsProgress).values(values).onConflictDoNothing()
       )
     );
+
+    // Ya usamos sortLessons que ahora prioriza orderIndex, por lo que la primera lección
+    // se desbloqueará correctamente según orderIndex si está definido.
 
     return {
       success: true,

@@ -431,9 +431,10 @@ export default function StudentDetails({
                           <h2 className="mb-2 line-clamp-3 text-3xl font-semibold sm:mb-4 sm:text-4xl">
                             {course.title}
                           </h2>
+                          {/* Featured Courses (desktop badge) */}
                           <Badge
                             variant="outline"
-                            className="border-primary text-primary mb-2"
+                            className="mb-2 border-none bg-[#01142B] text-white"
                           >
                             {course.category?.name ?? 'Sin categoría'}
                           </Badge>
@@ -537,9 +538,10 @@ export default function StudentDetails({
                                 </h3>
                               </Link>
                               <div className="mt-1 -mb-1 flex items-center justify-between gap-x-2 sm:mt-2 sm:mb-3">
+                                {/* Top Cursos carousel badge */}
                                 <Badge
                                   variant="outline"
-                                  className="border-primary bg-background text-primary line-clamp-1 max-w-[60%] text-[8px] sm:text-sm"
+                                  className="line-clamp-1 max-w-[60%] border-none bg-[#01142B] text-[8px] text-white sm:text-sm"
                                 >
                                   {course.category?.name}
                                 </Badge>

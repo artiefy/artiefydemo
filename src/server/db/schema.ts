@@ -1,7 +1,10 @@
 import { relations, sql } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   date,
+  decimal,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -11,8 +14,10 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { vector } from 'drizzle-orm/pg-core'; // <-- Usa esto, ya que drizzle-orm/pg-core lo soporta
 
 // Tabla de usuarios (con soporte para Clerk)
 export const users = pgTable(
@@ -96,6 +101,8 @@ export const courses = pgTable('courses', {
   isActive: boolean('is_active').default(true),
   is_top: boolean('is_top').default(false),
   is_featured: boolean('is_featured').default(false),
+  // 👉 Agrega la columna embedding para pgvector (usa 1536 dimensiones para OpenAI)
+  embedding: vector('embedding', { dimensions: 1536 }),
 });
 
 // Tabla de tipos de actividades
@@ -152,10 +159,12 @@ export const preferences = pgTable('preferences', {
 
 // Tabla de lecciones
 export const lessons = pgTable('lessons', {
-  id: serial('id').primaryKey(), // ID autoincremental de la lección
-  title: varchar('title', { length: 255 }).notNull(), // Título de la lección
+  id: serial('id').primaryKey(),
+  title: varchar('title', { length: 255 }).notNull(),
   description: text('description'), // Descripción de la lección
   duration: integer('duration').notNull(),
+  // NUEVO: índice de orden explícito para evitar depender del título
+  orderIndex: integer('order_index').notNull().default(0),
   coverImageKey: text('cover_image_key').notNull(), // Clave de la imagen en S3
   coverVideoKey: text('cover_video_key').notNull(), // Clave del video en S3
   courseId: integer('course_id')
@@ -311,19 +320,26 @@ export const projectsTaken = pgTable('projects_taken', {
 });
 
 // Tabla de progreso de lecciones por usuario
-export const userLessonsProgress = pgTable('user_lessons_progress', {
-  userId: text('user_id')
-    .references(() => users.id)
-    .notNull(),
-  lessonId: integer('lesson_id')
-    .references(() => lessons.id)
-    .notNull(),
-  progress: real('progress').default(0).notNull(),
-  isCompleted: boolean('is_completed').default(false).notNull(),
-  isLocked: boolean('is_locked').default(true),
-  isNew: boolean('is_new').default(true).notNull(),
-  lastUpdated: timestamp('last_updated').defaultNow().notNull(),
-});
+export const userLessonsProgress = pgTable(
+  'user_lessons_progress',
+  {
+    userId: text('user_id')
+      .references(() => users.id)
+      .notNull(),
+    lessonId: integer('lesson_id')
+      .references(() => lessons.id)
+      .notNull(),
+    progress: real('progress').default(0).notNull(),
+    isCompleted: boolean('is_completed').default(false).notNull(),
+    isLocked: boolean('is_locked').default(true),
+    isNew: boolean('is_new').default(true).notNull(),
+    lastUpdated: timestamp('last_updated').defaultNow().notNull(),
+  },
+  // AÑADIR índice único para soportar onConflictDoUpdate y evitar duplicados
+  (table) => [
+    unique('uniq_user_lesson_progress').on(table.userId, table.lessonId),
+  ]
+);
 
 //tabla de foros
 export const forums = pgTable('forums', {
@@ -383,7 +399,7 @@ export const userActivitiesProgress = pgTable('user_activities_progress', {
   progress: real('progress').default(0).notNull(),
   isCompleted: boolean('is_completed').default(false).notNull(),
   lastUpdated: timestamp('last_updated').defaultNow().notNull(),
-  revisada: boolean('revisada').references(() => activities.revisada),
+  revisada: boolean('revisada'), // <-- Elimina .references(() => activities.revisada)
   attemptCount: integer('attempt_count').default(0),
   finalGrade: real('final_grade'),
   lastAttemptAt: timestamp('last_attempt_at'),
@@ -484,6 +500,7 @@ export const courseTypes = pgTable('course_types', {
 export const materiaGrades = pgTable(
   'materia_grades',
   {
+    id: serial('id').primaryKey(),
     materiaId: integer('materia_id')
       .references(() => materias.id)
       .notNull(),
@@ -493,10 +510,8 @@ export const materiaGrades = pgTable(
     grade: real('grade').notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
-  (table) => [
-    primaryKey({ columns: [table.materiaId, table.userId] }),
-    unique('uniq_materia_user').on(table.materiaId, table.userId),
-  ]
+  // Solo deja el índice único, elimina el primaryKey compuesto
+  (table) => [unique('uniq_materia_user').on(table.materiaId, table.userId)]
 );
 
 export const parameterGrades = pgTable(
@@ -951,10 +966,11 @@ export const chat_messages = pgTable('chat_messages', {
   conversation_id: integer('conversation_id')
     .references(() => conversations.id)
     .notNull(),
-  sender: text('sender').notNull(), // Este campo puede ser el ID del usuario o su nombre
+  sender: text('sender').notNull(),
   senderId: text('sender_id').references(() => users.id),
   message: text('message').notNull(),
   created_at: timestamp('created_at').defaultNow().notNull(),
+  courses_data: jsonb('courses_data').default(null), // <-- Asegura default null para evitar errores de consulta
 });
 
 // Tabla de roles secundarios
@@ -1294,10 +1310,11 @@ export const pagos = pgTable('pagos', {
   userId: text('user_id')
     .references(() => users.id)
     .notNull(),
-  programaId: integer('programa_id')
-    .references(() => programas.id)
-    .notNull(),
-  concepto: varchar('concepto', { length: 100 }).notNull(), // Ej: INSCRIPCIÓN, CUOTA, etc.
+  programaId: integer('programa_id').references(() => programas.id, {
+    onDelete: 'set null',
+    onUpdate: 'cascade',
+  }),
+  concepto: varchar('concepto', { length: 100 }).notNull(),
   nroPago: integer('nro_pago').notNull(),
   fecha: date('fecha').notNull(),
   metodo: varchar('metodo', { length: 50 }).notNull(),
@@ -1307,4 +1324,127 @@ export const pagos = pgTable('pagos', {
   receiptUrl: varchar('receipt_url', { length: 512 }),
   receiptName: varchar('receipt_name', { length: 255 }),
   receiptUploadedAt: timestamp('receipt_uploaded_at', { withTimezone: true }),
+
+  // ✅ Estado de verificación del comprobante
+  receiptVerified: boolean('receipt_verified').notNull().default(false),
+  receiptVerifiedAt: timestamp('receipt_verified_at', { withTimezone: true }),
+  receiptVerifiedBy: text('receipt_verified_by').references(() => users.id),
+
+  // 📎 (Opcional) archivo “verificado”/validado (por ejemplo, versión sellada)
+  verifiedReceiptKey: varchar('verified_receipt_key', { length: 255 }),
+  verifiedReceiptUrl: varchar('verified_receipt_url', { length: 512 }),
+  verifiedReceiptName: varchar('verified_receipt_name', { length: 255 }),
+});
+
+// 🆕 Historial de verificaciones de comprobantes (tabla intermedia)
+export const pagoVerificaciones = pgTable('pago_verificaciones', {
+  id: serial('id').primaryKey(),
+  pagoId: integer('pago_id')
+    .references(() => pagos.id, { onDelete: 'cascade' })
+    .notNull(),
+  verifiedBy: text('verified_by').references(() => users.id), // ← ahora NULLABLE
+  notes: text('notes'),
+  fileKey: varchar('file_key', { length: 255 }),
+  fileUrl: varchar('file_url', { length: 512 }),
+  fileName: varchar('file_name', { length: 255 }),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const userProgramPrice = pgTable('user_program_price', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id')
+    .references(() => users.id)
+    .notNull(),
+  programaId: integer('programa_id')
+    .references(() => programas.id)
+    .notNull(),
+  price: decimal('price', { precision: 12, scale: 2 })
+    .notNull()
+    .default('150000'),
+  numCuotas: integer('num_cuotas').notNull().default(12),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const userProgramPriceRelations = relations(
+  userProgramPrice,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userProgramPrice.userId],
+      references: [users.id],
+    }),
+    programa: one(programas, {
+      fields: [userProgramPrice.programaId],
+      references: [programas.id],
+    }),
+  })
+);
+
+export const waMessages = pgTable(
+  'wa_messages',
+  {
+    id: serial('id').primaryKey(),
+    metaMessageId: text('meta_message_id'),
+    waid: varchar('waid', { length: 32 }).notNull(),
+    name: text('name'),
+    direction: varchar('direction', { length: 16 }).notNull(),
+    msgType: varchar('msg_type', { length: 32 }).notNull(),
+    body: text('body'),
+    tsMs: bigint('ts_ms', { mode: 'number' }).notNull(),
+    raw: jsonb('raw'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    mediaId: text('media_id'),
+    mediaType: text('media_type'),
+    fileName: text('file_name'),
+  },
+  // Cambia el objeto por un array para evitar el warning deprecado
+  (t) => [
+    index('wa_messages_waid_ts_idx').on(t.waid, t.tsMs),
+    uniqueIndex('wa_messages_meta_unique').on(t.metaMessageId),
+  ]
+);
+
+// =========================
+// Etiquetas para WhatsApp
+// =========================
+export const waTags = pgTable(
+  'wa_tags',
+  {
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 64 }).notNull(),
+    color: varchar('color', { length: 16 }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex('wa_tags_name_unique').on(t.name)]
+);
+
+/**
+ * Relación N:M entre WAID (conversación) y etiqueta.
+ * Usamos waid directamente para NO tocar nada de tu modelo actual.
+ */
+export const waConversationTags = pgTable(
+  'wa_conversation_tags',
+  {
+    waid: varchar('waid', { length: 32 }).notNull(),
+    tagId: integer('tag_id')
+      .notNull()
+      .references(() => waTags.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.waid, t.tagId] }),
+    index('wa_ct_w_idx').on(t.waid),
+    index('wa_ct_t_idx').on(t.tagId),
+  ]
+);
+
+// Tabla requerida por n8n para Chat Memory
+export const n8nChatHistories = pgTable('n8n_chat_histories', {
+  id: serial('id').primaryKey(),
+  session_id: varchar('session_id', { length: 255 }).notNull(),
+  role: varchar('role', { length: 50 }).notNull(), // 'user' | 'assistant'
+  content: text('content').notNull(),
+  created_at: timestamp('created_at').defaultNow().notNull(),
 });

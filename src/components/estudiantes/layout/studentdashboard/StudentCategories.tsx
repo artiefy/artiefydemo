@@ -120,14 +120,20 @@ export default function StudentCategories({
           <div className="relative mb-4 w-full sm:w-3/4 md:w-1/3 lg:mb-0 lg:w-1/3">
             <FunnelIcon className="absolute top-1/2 left-3 size-5 -translate-y-1/2 fill-gray-500" />
             <select
-              className="focus:border-primary focus:ring-primary block w-full cursor-pointer rounded-lg border border-gray-300 bg-gray-50 p-2 pl-10 text-sm text-gray-900"
+              className="focus:border-primary focus:ring-primary block w-full cursor-pointer rounded-lg border border-gray-300 bg-[#01142B] p-2 pl-10 text-sm text-white"
               onChange={(e) => handleCategorySelect(e.target.value || null)}
               value={searchParams?.get('category') ?? ''}
               aria-label="Seleccionar categoría"
             >
-              <option value="">Todas las categorías</option>
+              <option value="" className="bg-[#01142B] text-white">
+                Todas las categorías
+              </option>
               {categoriesData?.allCategories?.map((category) => (
-                <option key={category.id} value={category.id.toString()}>
+                <option
+                  key={category.id}
+                  value={category.id.toString()}
+                  className="bg-[#01142B] text-white"
+                >
                   {category.name}
                 </option>
               ))}
@@ -151,7 +157,7 @@ export default function StudentCategories({
                   }
                 }}
                 onKeyDown={handleKeyDown}
-                className="text-background w-full bg-white pr-10"
+                className="w-full bg-[#01142B] pr-10 text-white placeholder:text-gray-300"
                 aria-label="Buscar cursos"
               />
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
@@ -173,7 +179,7 @@ export default function StudentCategories({
         <div className="hidden grid-cols-2 gap-3 sm:grid sm:grid-cols-4 lg:grid-cols-8">
           {/* Botón "Todos los cursos" solo visible en desktop */}
           <div
-            className={`flex aspect-square cursor-pointer flex-col items-center justify-center rounded-lg bg-gray-50 p-3 text-center transition-transform hover:scale-105 hover:shadow-lg active:scale-95 ${
+            className={`flex aspect-square cursor-pointer flex-col items-center justify-center rounded-lg bg-gray-800 p-3 text-center transition-transform hover:scale-105 hover:shadow-lg active:scale-95 ${
               loadingCategory === 'all' ? 'pr-4' : ''
             }`}
             onClick={() => handleCategorySelect(null)}
@@ -185,19 +191,17 @@ export default function StudentCategories({
               {loadingCategory === 'all' ? (
                 <>
                   <Icons.spinner
-                    className="text-background size-8"
+                    className="size-8 text-white"
                     aria-hidden="true"
                   />
-                  <p className="text-background mt-2 text-xs">
-                    Buscando Cursos...
-                  </p>
+                  <p className="mt-2 text-xs text-white">Buscando Cursos...</p>
                 </>
               ) : (
                 <>
                   <div className="mb-3 text-2xl text-blue-600">
                     <FiCode className="size-6" aria-hidden="true" />
                   </div>
-                  <h3 className="text-background text-sm font-semibold">
+                  <h3 className="text-sm font-semibold text-white">
                     Todos los cursos
                   </h3>
                 </>
@@ -211,7 +215,7 @@ export default function StudentCategories({
             .map((category: Category, index: number) => (
               <div
                 key={category.id}
-                className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-lg bg-gray-50 p-3 text-center transition-transform hover:scale-105 hover:shadow-lg active:scale-95"
+                className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-lg bg-gray-800 p-3 text-center transition-transform hover:scale-105 hover:shadow-lg active:scale-95"
                 onClick={() => handleCategorySelect(category.id.toString())}
                 role="button"
                 tabIndex={0}
@@ -221,10 +225,10 @@ export default function StudentCategories({
                   {loadingCategory === category.id.toString() ? (
                     <>
                       <Icons.spinner
-                        className="text-background size-8"
+                        className="size-8 text-white"
                         aria-hidden="true"
                       />
-                      <p className="text-background mt-2 text-xs">
+                      <p className="mt-2 text-xs text-white">
                         Buscando Cursos...
                       </p>
                     </>
@@ -256,10 +260,10 @@ export default function StudentCategories({
                           className="size-9"
                         />
                       </div>
-                      <h3 className="text-background text-sm font-semibold">
+                      <h3 className="text-sm font-semibold text-white">
                         {category.name}
                       </h3>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-gray-300">
                         {`${category.courses?.length ?? 0} curso${
                           category.courses?.length !== 1 ? 's' : ''
                         }`}
@@ -339,7 +343,7 @@ export function CourseSearchBar({
           }
         }}
         onKeyDown={handleKeyDown}
-        className="text-background w-full bg-white pr-10"
+        className="w-full bg-[#01142B] pr-10 text-white placeholder:text-gray-300"
         aria-label="Buscar cursos"
         autoComplete="off"
         data-no-chatbot="true"

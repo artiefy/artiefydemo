@@ -14,7 +14,7 @@ import {
   updateCourse,
 } from '~/server/queries/queries';
 
-import CourseListAdmin from './../../components/CourseListAdmin';
+import CourseListAdmin from '../../components/CourseListAdmin';
 
 type ExtendedCourseData = CourseData & {
   individualPrice?: number;

@@ -2,19 +2,12 @@
 
 export default function AboutHero() {
   return (
-    <section className="bg-gradient-to-br from-blue-900 to-blue-700 py-16 text-white">
-      <div className="container mx-auto text-center">
-        <h1 className="mb-4 text-4xl font-extrabold md:text-6xl">
-          Acerca de <span className="text-blue-200">Nosotros</span>
+    <section className="py-16 bg-gradient-to-r from-gray-900 to-gray-800 text-white transition-opacity duration-1000 opacity-0 animate-fadeIn">
+      <div className="container mx-auto px-4 text-center">
+        <h1 className="text-4xl md:text-5xl font-bold mb-4">
+          Acerca de <span className="text-blue-400">Nosotros</span>
         </h1>
-        <p className="mx-auto max-w-2xl text-lg md:text-2xl">
-          Somos un centro de investigación y desarrollo tecnológico comprometido
-          con la innovación y la excelencia. Nos dedicamos a la implementación
-          de tecnologías emergentes en la educación, el desarrollo de proyectos
-          de ciencia y tecnología, la creación de software avanzado, la
-          innovación en tecnología biomédica y el desarrollo de soluciones de
-          inteligencia artificial.
-        </p>
+        <p className="text-lg md:text-xl">Inicio - Nosotros</p>
       </div>
     </section>
   );

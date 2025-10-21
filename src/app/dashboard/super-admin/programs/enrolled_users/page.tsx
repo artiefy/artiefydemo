@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
+import { useUser } from '@clerk/nextjs';
 import { saveAs } from 'file-saver';
 import { Loader2, Mail, UserPlus, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -37,7 +38,7 @@ const studentSchema = z.object({
   isSubOnly: z.boolean().optional(),
   enrolledInCourse: z.boolean().optional(),
   inscripcionOrigen: z.enum(['formulario', 'artiefy']).optional(),
-  carteraStatus: z.enum(['activo', 'inactivo']).optional(),
+  carteraStatus: z.enum(['activo', 'inactivo', 'no verificado']).optional(),
 });
 
 const courseSchema = z.object({
@@ -86,7 +87,7 @@ interface Student {
   enrolledInCourse?: boolean;
   enrolledInCourseLabel?: 'Sí' | 'No';
   inscripcionOrigen?: 'formulario' | 'artiefy';
-  carteraStatus?: 'activo' | 'inactivo';
+  carteraStatus?: 'activo' | 'inactivo' | 'no verificado';
 
   // ➕ CAMPOS PARA CARTERA Y PAGOS
   document?: string;
@@ -181,7 +182,7 @@ const allColumns: Column[] = [
     label: 'Cartera',
     defaultVisible: true,
     type: 'select',
-    options: ['activo', 'inactivo'], // solo para filtrar
+    options: ['activo', 'inactivo', 'No verificado'],
   },
   {
     id: 'inscripcionOrigen',
@@ -277,10 +278,316 @@ export default function EnrolledUsersPage() {
   const [attachments, setAttachments] = useState<File[]>([]);
   const [sendWhatsapp, setSendWhatsapp] = useState(false);
   const [loadingEmail, setLoadingEmail] = useState(false);
+  const [editablePagos, setEditablePagos] = useState<Pago[]>([]);
+  const { user: clerkUser } = useUser();
+
+  // Modal de vista previa de comprobantes
+  const [receiptPreview, setReceiptPreview] = useState<{
+    open: boolean;
+    url?: string;
+    name?: string;
+  }>({ open: false });
+
+  const openReceiptPreview = (url?: string, name?: string) => {
+    if (!url) return;
+    setReceiptPreview({ open: true, url, name });
+  };
+  const closeReceiptPreview = () =>
+    setReceiptPreview((p) => ({ ...p, open: false }));
+
+  const isPdfUrl = (u?: string) => !!u && /\.pdf(\?|$)/i.test(u);
+
+  // Reemplaza tu botón de imprimir con esta función más robusta
+
+  // Opción 3: La más simple - usar parámetros de ventana específicos
+
+  const handlePrint = () => {
+    // Crear ventana con parámetros específicos para que aparezca al frente
+    const printWindow = window.open(
+      '',
+      '_blank',
+      'width=800,height=600,scrollbars=yes,resizable=yes,toolbar=no,location=no,status=no,menubar=no,top=50,left=50'
+    );
+
+    const printContent = generatePrintableHTML();
+
+    if (!printWindow) {
+      alert('No se pudo abrir la ventana de impresión.');
+      return;
+    }
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+
+    // Forzar que la ventana esté al frente
+    printWindow.focus();
+    printWindow.moveTo(100, 100); // Mover la ventana para asegurar visibilidad
+
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.focus(); // Doble enfoque para asegurar
+        printWindow.print();
+        printWindow.close();
+      }, 300);
+    };
+  };
+
+  // Esta es la función generatePrintableHTML que también necesitas:
+  const generatePrintableHTML = () => {
+    return `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Factura de Matrícula - ${currentUser?.name}</title>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+          color: black !important;
+          background: white !important;
+        }
+        
+        body {
+          font-family: Arial, sans-serif;
+          padding: 20px;
+          background: white !important;
+          color: black !important;
+        }
+        
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 30px;
+          border-bottom: 2px solid black;
+          padding-bottom: 15px;
+        }
+        
+        .logos {
+          display: flex;
+          gap: 20px;
+          align-items: center;
+        }
+        
+        .title {
+          text-align: right;
+        }
+        
+        .title h1 {
+          font-size: 16px;
+          font-weight: bold;
+          color: black !important;
+          margin-bottom: 5px;
+        }
+        
+        .title p {
+          font-size: 12px;
+          color: black !important;
+        }
+        
+        .info-section {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 30px;
+          margin-bottom: 30px;
+          font-size: 13px;
+        }
+        
+        .info-section p {
+          margin-bottom: 6px;
+          color: black !important;
+        }
+        
+        .info-section strong {
+          color: black !important;
+        }
+        
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 20px;
+          font-size: 12px;
+        }
+        
+        th, td {
+          border: 1px solid black !important;
+          padding: 6px;
+          text-align: left;
+          background: white !important;
+          color: black !important;
+        }
+        
+        th {
+          font-weight: bold;
+          background: white !important;
+          color: black !important;
+        }
+        
+        .text-right {
+          text-align: right;
+        }
+        
+        .text-center {
+          text-align: center;
+        }
+        
+        .totals {
+          border-top: 2px solid black;
+          padding-top: 15px;
+          margin-top: 20px;
+          font-size: 14px;
+        }
+        
+        .total-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        }
+        
+        .total-row.final {
+          font-weight: bold;
+          font-size: 16px;
+          border-top: 1px solid black;
+          padding-top: 8px;
+        }
+        
+        .footer {
+          margin-top: 30px;
+          text-align: center;
+          font-size: 11px;
+          border-top: 1px solid black;
+          padding-top: 10px;
+        }
+        
+        @page {
+          margin: 0.5in;
+          size: A4;
+        }
+        
+        @media print {
+          body { margin: 0; padding: 10px; }
+          .header { page-break-after: avoid; }
+          table { page-break-inside: avoid; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="logos">
+          <strong>ARTIEFY - PONAO</strong>
+        </div>
+        <div class="title">
+          <p>POLITÉCNICO NACIONAL DE ARTES Y OFICIOS</p>
+          <h1>FACTURA PAGO DE MATRÍCULA</h1>
+        </div>
+      </div>
+      
+      <div class="info-section">
+        <div>
+          <p><strong>NOMBRE ESTUDIANTE:</strong> ${currentUser?.name ?? '-'}</p>
+          <p><strong>CC:</strong> ${currentUser?.document ?? currentUser?.id ?? '-'}</p>
+          <p><strong>CELULAR:</strong> ${currentUser?.phone ?? '-'}</p>
+          <p><strong>PROGRAMA:</strong> ${userPrograms?.[0]?.title ?? '—'}</p>
+          <p><strong>FECHA:</strong> ${new Date().toLocaleDateString('es-CO')}</p>
+        </div>
+        <div>
+          <p><strong>DIRECCIÓN:</strong> ${currentUser?.address ?? '-'}</p>
+          <p><strong>CIUDAD:</strong> ${currentUser?.city ?? '-'}</p>
+          <p><strong>EMAIL:</strong> ${currentUser?.email ?? '-'}</p>
+          <p><strong>ESTADO:</strong> ${currentUser?.carteraStatus === 'activo' ? 'Al día' : 'En cartera'}</p>
+          <p><strong>FIN SUSCRIPCIÓN:</strong> ${currentUser?.subscriptionEndDate ? new Date(currentUser.subscriptionEndDate).toLocaleDateString('es-CO') : '-'}</p>
+        </div>
+      </div>
+      
+      <table>
+        <thead>
+          <tr>
+            <th>PRODUCTO</th>
+            <th class="text-center">N° PAGO</th>
+            <th>FECHA DE PAGO</th>
+            <th>MÉTODO DE PAGO</th>
+            <th class="text-right">VALOR</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${generateTableRows()}
+        </tbody>
+      </table>
+      
+      <div class="totals">
+        <div class="total-row">
+          <span>PLAN / VALOR PROGRAMA:</span>
+          <span>${formatCOP(price)}</span>
+        </div>
+        <div class="total-row">
+          <span>VALOR PAGADO:</span>
+          <span>${formatCOP(carteraInfo?.totalPagado ?? 0)}</span>
+        </div>
+        <div class="total-row final">
+          <span>DEUDA RESTANTE:</span>
+          <span>${formatCOP(carteraInfo?.deuda ?? 0)}</span>
+        </div>
+      </div>
+      
+      <div class="footer">
+        <p>Este documento es un comprobante de los pagos registrados</p>
+        <p>Fecha de impresión: ${new Date().toLocaleString('es-CO')}</p>
+      </div>
+    </body>
+    </html>
+  `;
+  };
+  const generateTableRows = () => {
+    let rows = '';
+
+    // Generar filas de cuotas (1-12)
+    for (let idx = 0; idx < 12; idx++) {
+      const cuotaNum = idx + 1;
+      const row = editablePagos[idx] ?? {};
+      const valor = typeof row.valor === 'number' ? row.valor : Number(row.valor ?? 0);
+
+      rows += `
+      <tr>
+        <td>${row.concepto ?? `Cuota ${cuotaNum}`}</td>
+        <td class="text-center">${row.nro_pago ?? row.nroPago ?? cuotaNum}</td>
+        <td>${row.fecha ? new Date(row.fecha).toLocaleDateString('es-CO') : '-'}</td>
+        <td>${row.metodo ?? '-'}</td>
+        <td class="text-right">${formatCOP(valor)}</td>
+      </tr>
+    `;
+    }
+
+    // Generar filas de conceptos especiales
+    const especiales = [
+      { label: 'PÓLIZA Y CARNET', idxBase: 12 },
+      { label: 'UNIFORME', idxBase: 13 },
+      { label: 'DERECHOS DE GRADO', idxBase: 14 },
+    ];
+
+    especiales.forEach(({ label, idxBase }) => {
+      const row = editablePagos[idxBase] ?? {};
+      const valor = typeof row.valor === 'number' ? row.valor : Number(row.valor ?? 0);
+
+      rows += `
+      <tr>
+        <td style="font-weight: bold;">${row.concepto ?? label}</td>
+        <td class="text-center">${idxBase + 1}</td>
+        <td>${row.fecha ? new Date(row.fecha).toLocaleDateString('es-CO') : '-'}</td>
+        <td>${row.metodo ?? '-'}</td>
+        <td class="text-right">${formatCOP(valor)}</td>
+      </tr>
+    `;
+    });
+
+    return rows;
+  };
+
+
   void setCodigoPais;
 
   // === NUEVO: estados para edición de cuotas y programa actual ===
-  const [editablePagos, setEditablePagos] = useState<Pago[]>([]);
   const [currentProgramId, setCurrentProgramId] = useState<string | null>(null);
 
   // Reutilizamos el input global para subir comprobante por fila
@@ -346,27 +653,31 @@ export default function EnrolledUsersPage() {
   // ⛳️ CONVIERTE esta función en useCallback para estabilizar referencia (ayuda con el useEffect)
   const mapPagosToEditable = useCallback(
     (pagosFromApi: unknown[]): Pago[] => {
-      const slots: Pago[] = Array.from({ length: 15 }, () => ({}));
+      const slots: Pago[] = Array.from({ length: 15 }, () => ({} as Pago));
 
       for (const raw of pagosFromApi ?? []) {
         const p = asRec(raw);
 
         const conceptoUC = getStr(p, 'concepto').toUpperCase().trim();
 
-        // nroPago puede venir con varios nombres
+        // nroPago puede venir con varios nombres (y a veces como "index" 0-based)
         const nroPagoNum = (() => {
           const n1 = getNum(p, 'nroPago');
           if (Number.isFinite(n1)) return n1;
           const n2 = getNum(p, 'nro_pago');
           if (Number.isFinite(n2)) return n2;
-          const n3 = getNum(p, 'numero'); // si tu backend a veces lo llama "numero"
-          return Number.isFinite(n3) ? n3 : NaN;
+          const n3 = getNum(p, 'numero');
+          if (Number.isFinite(n3)) return n3;
+          const idx0 = getNum(p, 'index');        // 👈 NUEVO
+          if (Number.isFinite(idx0)) return idx0 + 1; //    convertir 0-based → 1..12
+          return NaN;
         })();
+
 
         // ¿especial?
         const esp = ESPECIALES.find((e) => e.label === conceptoUC);
         if (esp) {
-          const idx = esp.idxBase; // 12..14
+          const idx = esp.idxBase; // 👈 este sí existe en ESPECIALES
           slots[idx] = {
             concepto: getStr(p, 'concepto') || esp.label,
             nro_pago: Number.isFinite(getNum(p, 'nroPago'))
@@ -386,6 +697,12 @@ export default function EnrolledUsersPage() {
             valor: Number.isFinite(getNum(p, 'valor')) ? getNum(p, 'valor') : 0,
             receiptUrl: getStr(p, 'receiptUrl') || undefined,
             receiptName: getStr(p, 'receiptName') || undefined,
+            receiptVerified: ((): boolean => {
+              const v = p.receiptVerified;
+              return typeof v === 'boolean' ? v : false;
+            })(),
+            verifiedReceiptUrl: getStr(p, 'verifiedReceiptUrl') || undefined,
+            verifiedReceiptName: getStr(p, 'verifiedReceiptName') || undefined,
           };
           continue;
         }
@@ -412,25 +729,22 @@ export default function EnrolledUsersPage() {
             valor: Number.isFinite(getNum(p, 'valor')) ? getNum(p, 'valor') : 0,
             receiptUrl: getStr(p, 'receiptUrl') || undefined,
             receiptName: getStr(p, 'receiptName') || undefined,
+            receiptVerified: ((): boolean => {
+              const v = p.receiptVerified;
+              return typeof v === 'boolean' ? v : false;
+            })(),
+            verifiedReceiptUrl: getStr(p, 'verifiedReceiptUrl') || undefined,
+            verifiedReceiptName: getStr(p, 'verifiedReceiptName') || undefined,
           };
         }
       }
 
-      // normaliza fechas a 'YYYY-MM-DD'
-      const normalized = slots.map((row) => ({
-        ...row,
-        fecha:
-          typeof row?.fecha === 'string'
-            ? toISODateLike(row.fecha)
-            : typeof row?.fecha === 'number' || row?.fecha instanceof Date
-              ? toISODateLike(row.fecha as string | number | Date)
-              : '',
-      }));
-
-      return ensure15(normalized);
+      return ensure15(slots);
     },
-    [ensure15, toISODateLike, ESPECIALES]
+    [ensure15, ESPECIALES]
   );
+
+
 
   const daysInMonthUTC = useCallback((year: number, month0: number) => {
     return new Date(Date.UTC(year, month0 + 1, 0)).getUTCDate();
@@ -522,144 +836,14 @@ export default function EnrolledUsersPage() {
     });
   }
 
-  const _normalizePagos = useCallback(
-    (raw: unknown[] = []): Pago[] => {
-      const toNum = (v: unknown): number => {
-        if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-        if (typeof v === 'string') {
-          const n = Number(v);
-          return Number.isFinite(n) ? n : 0;
-        }
-        return 0;
-      };
 
-      const toStr = (v: unknown): string => (typeof v === 'string' ? v : '');
-
-      // 3 conceptos especiales y sus posiciones/nroPago fijos
-      const SPECIALS = [
-        { label: 'PÓLIZA Y CARNET', idxBase: 12, nroPago: 13 },
-        { label: 'UNIFORME', idxBase: 13, nroPago: 14 },
-        { label: 'DERECHOS DE GRADO', idxBase: 14, nroPago: 15 },
-      ] as const;
-
-      // preparamos 15 slots (0..11 cuotas, 12..14 especiales)
-      const slots: Pago[] = Array.from({ length: 15 }, () => ({}));
-
-      for (const p of raw ?? []) {
-        const r = (p ?? {}) as Record<string, unknown>;
-
-        const conceptoRaw =
-          toStr(r.concepto) || getStr(r as Record<string, unknown>, 'producto');
-
-        const conceptoUC = conceptoRaw.toUpperCase().trim();
-
-        // extraer nroPago desde varios nombres posibles
-        const nroPago =
-          typeof r.nroPago === 'number'
-            ? r.nroPago
-            : typeof r.nroPago === 'string'
-              ? Number(r.nroPago)
-              : typeof r.nro_pago === 'number'
-                ? r.nro_pago
-                : typeof r.nro_pago === 'string'
-                  ? Number(r.nro_pago)
-                  : Number.isFinite(
-                        getNum(r as Record<string, unknown>, 'numero')
-                      )
-                    ? getNum(r as Record<string, unknown>, 'numero')
-                    : NaN;
-
-        // ¿coincide con un especial por LABEL exacto?
-        const esp = SPECIALS.find((e) => e.label === conceptoUC);
-
-        if (esp) {
-          const idx = esp.idxBase; // 12..14
-          slots[idx] = {
-            concepto: conceptoRaw || esp.label,
-            nro_pago: Number.isFinite(
-              getNum(r as Record<string, unknown>, 'nroPago')
-            )
-              ? getNum(r as Record<string, unknown>, 'nroPago')
-              : Number.isFinite(
-                    getNum(r as Record<string, unknown>, 'nro_pago')
-                  )
-                ? getNum(r as Record<string, unknown>, 'nro_pago')
-                : esp.nroPago,
-            fecha:
-              typeof r.fecha === 'string' ||
-              typeof r.fecha === 'number' ||
-              r.fecha instanceof Date
-                ? r.fecha
-                : '',
-            metodo:
-              toStr(r.metodo) ||
-              getStr(r as Record<string, unknown>, 'metodoPago'),
-            valor: toNum(r.valor),
-            receiptUrl:
-              typeof r.receiptUrl === 'string'
-                ? (r.receiptUrl as string)
-                : undefined,
-            receiptName:
-              typeof r.receiptName === 'string'
-                ? (r.receiptName as string)
-                : undefined,
-          };
-          continue;
-        }
-
-        // si no es especial, solo mapeamos a cuotas por nroPago 1..12
-        if (Number.isFinite(nroPago) && nroPago >= 1 && nroPago <= 12) {
-          const idx = (nroPago as number) - 1;
-          slots[idx] = {
-            concepto: conceptoRaw || `Cuota ${idx + 1}`,
-            nro_pago: nroPago as number,
-            fecha:
-              typeof r.fecha === 'string' ||
-              typeof r.fecha === 'number' ||
-              r.fecha instanceof Date
-                ? r.fecha
-                : '',
-            metodo:
-              toStr(r.metodo) ||
-              getStr(r as Record<string, unknown>, 'metodoPago'),
-            valor: toNum(r.valor),
-            receiptUrl:
-              typeof r.receiptUrl === 'string'
-                ? (r.receiptUrl as string)
-                : undefined,
-            receiptName:
-              typeof r.receiptName === 'string'
-                ? (r.receiptName as string)
-                : undefined,
-          };
-        }
-        // si llega un nroPago 13..15 sin label especial correcto, lo ignoramos para no contaminar cuotas
-      }
-
-      // normaliza fechas a 'YYYY-MM-DD'
-      const normalized = slots.map((row) => ({
-        ...row,
-        fecha:
-          typeof row?.fecha === 'string'
-            ? toISODateLike(row.fecha)
-            : typeof row?.fecha === 'number' || row?.fecha instanceof Date
-              ? toISODateLike(
-                  row.fecha as string | number | Date | null | undefined
-                )
-              : '',
-      }));
-
-      return ensure15(normalized);
-    },
-    [toISODateLike, ensure15]
-  );
 
   // Al finalizar openCarteraModal, cuando ya tengas pagosUsuarioPrograma:
 
   // === GUARDAR UNA SOLA CUOTA ===
   async function savePagoRow(index: number) {
-    if (!carteraUserId || !currentProgramId) {
-      alert('Falta userId o programId');
+    if (!carteraUserId) {
+      alert('Falta userId');
       return;
     }
 
@@ -677,8 +861,8 @@ export default function EnrolledUsersPage() {
       (especial ? labelForIndex(index) : `Cuota ${index + 1}`);
     const nro_pago = Number(
       row.nro_pago ??
-        row.nroPago ??
-        (especial ? nroPagoForIndex(index) : index + 1)
+      row.nroPago ??
+      (especial ? nroPagoForIndex(index) : index + 1)
     );
 
     try {
@@ -689,7 +873,7 @@ export default function EnrolledUsersPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: carteraUserId,
-            programId: Number(currentProgramId),
+            programId: currentProgramId ? Number(currentProgramId) : null, // 👈 soporta null
             index,
             concepto,
             nro_pago,
@@ -800,7 +984,52 @@ export default function EnrolledUsersPage() {
     {}
   );
   const [showColumnSelector, setShowColumnSelector] = useState(false);
-  const [selectedProgram, setSelectedProgram] = useState('');
+  const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
+  // Opciones únicas de programas
+  const programOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(students.flatMap((s) => s.programTitles ?? []))
+      )
+        .map((t) => String(t ?? '').trim())
+        .filter(Boolean),
+    [students]
+  );
+
+  // Estado/UI del multiselect
+  const [programQuery, setProgramQuery] = useState('');
+  const [programOpen, setProgramOpen] = useState(false);
+  const programRef = useRef<HTMLDivElement>(null);
+
+  // Lista filtrada (excluye ya seleccionados mientras escribes)
+  const filteredProgramOptions = useMemo(
+    () =>
+      programOptions.filter(
+        (o) =>
+          o.toLowerCase().includes(programQuery.toLowerCase()) &&
+          !selectedPrograms.includes(o)
+      ),
+    [programOptions, programQuery, selectedPrograms]
+  );
+
+  // Handlers
+  const toggleProgram = (val: string) =>
+    setSelectedPrograms((prev) =>
+      prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]
+    );
+  const removeProgram = (val: string) =>
+    setSelectedPrograms((prev) => prev.filter((v) => v !== val));
+
+  // Cerrar al hacer click fuera
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!programRef.current) return;
+      if (!programRef.current.contains(e.target as Node)) setProgramOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
   const [programs, setPrograms] = useState<{ id: string; title: string }[]>([]);
   const [userPrograms, setUserPrograms] = useState<
     { id: string; title: string }[]
@@ -811,6 +1040,58 @@ export default function EnrolledUsersPage() {
   const currentUser = currentUserId
     ? students.find((s) => s.id === currentUserId)
     : undefined;
+  // Estado de cartera que respeta la regla del "último pago del mes no verificado"
+  const estadoCarteraUI = useMemo(() => {
+    // Estado base según el dato que ya trae el usuario
+    const base =
+      currentUser?.carteraStatus === 'activo' ? 'Al día' : 'En cartera';
+
+    // Si no hay pagos cargados aún, mostramos el base
+    if (!editablePagos || editablePagos.length === 0) return base;
+
+    // Filtramos pagos del MES actual que tengan algún valor (>0) y fecha válida
+    const hoy = new Date();
+    const y = hoy.getFullYear();
+    const m = hoy.getMonth();
+
+    const pagosMesActual = editablePagos.filter((p) => {
+      const f = p?.fecha ? new Date(String(p.fecha)) : null;
+      const v = typeof p?.valor === 'number'
+        ? p.valor
+        : Number(p?.valor ?? 0);
+      return (
+        f &&
+        !isNaN(f.getTime()) &&
+        f.getFullYear() === y &&
+        f.getMonth() === m &&
+        v > 0
+      );
+    });
+
+    if (pagosMesActual.length === 0) {
+      // No hay pago en el mes → no cambia nada
+      return base;
+    }
+
+    // Tomamos el ÚLTIMO pago del mes por fecha
+    const ultimoPagoMes = [...pagosMesActual].sort(
+      (a, b) =>
+        new Date(String(a.fecha)).getTime() - new Date(String(b.fecha)).getTime()
+    )[pagosMesActual.length - 1];
+
+    // Regla: si tiene pago y el verificado dice "No verificado", mostramos "No verificado"
+    if (
+      ultimoPagoMes &&
+      (ultimoPagoMes.valor as number) > 0 &&
+      ultimoPagoMes.receiptUrl && // hay comprobante subido
+      ultimoPagoMes.receiptVerified === false
+    ) {
+      return 'No verificado';
+    }
+
+    return base;
+  }, [editablePagos, currentUser?.carteraStatus]);
+
   const [userCourses, setUserCourses] = useState<
     { id: string; title: string }[]
   >([]);
@@ -853,6 +1134,10 @@ export default function EnrolledUsersPage() {
     valor?: string | number | null;
     receiptUrl?: string;
     receiptName?: string;
+    receiptVerified?: boolean;
+    verifiedReceiptUrl?: string;
+    verifiedReceiptName?: string;
+
   }
 
   interface CarteraInfo {
@@ -860,11 +1145,22 @@ export default function EnrolledUsersPage() {
     pagosUsuarioPrograma: Pago[];
     totalPagado: number;
     deuda: number;
-    carnetPolizaUniforme?: number; // monto detectado
-    derechosGrado?: number; // monto detectado
+    carnetPolizaUniforme: number; // obligatorio
+    derechosGrado: number;        // obligatorio
+    planType?: string;             // opcional
   }
 
-  const [carteraInfo, setCarteraInfo] = useState<CarteraInfo | null>(null);
+  // Ahora el estado usa exactamente CarteraInfo
+  const [carteraInfo, setCarteraInfo] = useState<CarteraInfo>({
+    programaPrice: 0,
+    pagosUsuarioPrograma: [],
+    totalPagado: 0,
+    deuda: 0,
+    carnetPolizaUniforme: 0, // inicializado
+    derechosGrado: 0,        // inicializado
+    planType: undefined,
+  });
+
 
   async function fetchUserCourses(userId: string) {
     const res = await fetch(
@@ -881,6 +1177,42 @@ export default function EnrolledUsersPage() {
     setUserCourses(unique);
   }
 
+  const DEFAULT_CUOTAS = 12;
+  const DEFAULT_VALOR = 150000;
+
+  const [price, setPrice] = useState<number>(0);
+
+  useEffect(() => {
+    if (carteraInfo?.programaPrice) {
+      // Si ya hay un plan guardado
+      setPrice(carteraInfo.programaPrice);
+
+      // Ajustamos las cuotas al valor existente
+      const cuotas = Array.from({ length: DEFAULT_CUOTAS }, (_, idx) => ({
+        concepto: `Cuota ${idx + 1}`,
+        nro_pago: idx + 1,
+        fecha: '',
+        metodo: '',
+        valor: Math.round(carteraInfo.programaPrice / DEFAULT_CUOTAS),
+      }));
+      setEditablePagos(cuotas);
+    } else {
+      // Si no hay plan creado, usamos 12 cuotas por defecto de 150000
+      setPrice(DEFAULT_CUOTAS * DEFAULT_VALOR);
+
+      const cuotas = Array.from({ length: DEFAULT_CUOTAS }, (_, idx) => ({
+        concepto: `Cuota ${idx + 1}`,
+        nro_pago: idx + 1,
+        fecha: '',
+        metodo: '',
+        valor: DEFAULT_VALOR,
+      }));
+      setEditablePagos(cuotas);
+    }
+  }, [carteraInfo]);
+
+
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
@@ -895,51 +1227,65 @@ export default function EnrolledUsersPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showColumnSelector]);
 
-  async function fetchPagosUsuarioPrograma(userId: string, programId: string) {
-    const url = `/api/super-admin/enroll_user_program/programsUser/pagos?userId=${userId}&programId=${programId}`;
-    console.log('➡️ GET Pagos:', url);
-
-    const res = await fetch(url);
+  async function fetchPagosUsuarioPrograma(userId: string, programId: string): Promise<Pago[]> {
+    const res = await fetch(
+      `/api/super-admin/enroll_user_program/programsUser/pagos?userId=${userId}&programId=${programId}`
+    );
     if (!res.ok) throw new Error('Error cargando pagos');
 
     const json: unknown = await res.json();
-    const pagos: Pago[] = Array.isArray((json as { pagos?: unknown }).pagos)
-      ? ((json as { pagos?: unknown }).pagos as unknown[]).map((p) => {
-          const r = p as Record<string, unknown>;
-          return {
-            concepto: typeof r.concepto === 'string' ? r.concepto : null,
-            nro_pago:
-              typeof r.nro_pago === 'string' || typeof r.nro_pago === 'number'
-                ? r.nro_pago
-                : null,
-            nroPago:
-              typeof r.nroPago === 'string' || typeof r.nroPago === 'number'
-                ? r.nroPago
-                : null,
-            fecha:
-              typeof r.fecha === 'string' ||
+
+    const pagos = Array.isArray((json as { pagos?: unknown }).pagos)
+      ? ((json as { pagos?: unknown }).pagos as unknown[]).map((p): Pago => {
+        const r = p as Record<string, unknown>;
+        return {
+          concepto:
+            typeof r.concepto === 'string' ? r.concepto : null,
+          nro_pago:
+            typeof r.nro_pago === 'string' || typeof r.nro_pago === 'number'
+              ? r.nro_pago
+              : null,
+          nroPago:
+            typeof r.nroPago === 'string' || typeof r.nroPago === 'number'
+              ? r.nroPago
+              : null,
+          fecha:
+            typeof r.fecha === 'string' ||
               typeof r.fecha === 'number' ||
               r.fecha instanceof Date
-                ? (r.fecha as string | number | Date)
-                : null,
-            metodo: typeof r.metodo === 'string' ? r.metodo : null,
-            valor:
-              typeof r.valor === 'string' || typeof r.valor === 'number'
-                ? r.valor
-                : null,
+              ? r.fecha
+              : null,
+          metodo: typeof r.metodo === 'string' ? r.metodo : null,
+          valor:
+            typeof r.valor === 'string' || typeof r.valor === 'number'
+              ? r.valor
+              : null,
 
-            // 👇 nuevos
-            receiptUrl:
-              typeof r.receiptUrl === 'string' ? r.receiptUrl : undefined,
-            receiptName:
-              typeof r.receiptName === 'string' ? r.receiptName : undefined,
-          } satisfies Pago;
-        })
+          // 👇 campos del comprobante original
+          receiptUrl:
+            typeof r.receiptUrl === 'string' ? r.receiptUrl : undefined,
+          receiptName:
+            typeof r.receiptName === 'string' ? r.receiptName : undefined,
+
+          // 👇 NUEVOS: verificación + archivo verificado
+          receiptVerified:
+            typeof r.receiptVerified === 'boolean' ? (r.receiptVerified as boolean) : false,
+          verifiedReceiptUrl:
+            typeof r.verifiedReceiptUrl === 'string'
+              ? (r.verifiedReceiptUrl as string)
+              : undefined,
+          verifiedReceiptName:
+            typeof r.verifiedReceiptName === 'string'
+              ? (r.verifiedReceiptName as string)
+              : undefined,
+        };
+      })
       : [];
 
-    console.log('✅ Pagos recibidos:', pagos.length);
     return pagos;
   }
+
+
 
   useEffect(() => {
     // función asíncrona para cargar programasp
@@ -1018,13 +1364,13 @@ export default function EnrolledUsersPage() {
 
     const whatsappNumbers = sendWhatsapp
       ? Array.from(
-          new Set([
-            ...students
-              .filter((s) => selectedStudents.includes(s.id) && s.phone)
-              .map((s) => `${codigoPais}${s.phone}`),
-            ...manualPhones.map((p) => `${codigoPais}${p}`),
-          ])
-        )
+        new Set([
+          ...students
+            .filter((s) => selectedStudents.includes(s.id) && s.phone)
+            .map((s) => `${codigoPais}${s.phone}`),
+          ...manualPhones.map((p) => `${codigoPais}${p}`),
+        ])
+      )
       : [];
 
     try {
@@ -1088,6 +1434,30 @@ export default function EnrolledUsersPage() {
   const [carteraUserId, setCarteraUserId] = useState<string | null>(null);
   const [carteraReceipt, setCarteraReceipt] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const existingRecord = Boolean(carteraInfo?.programaPrice); // true si ya hay precio guardado
+  const userId = currentUser?.id; // o currentUser?.document si prefieres
+  const programaId = userPrograms?.[0]?.id; // tomamos el primer programa
+
+
+
+  const handleSavePrice = async () => {
+    // Guardamos en backend
+    await fetch('/api/super-admin/teams/price_program', {
+      method: existingRecord ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, programaId, price }),
+    });
+
+    setEditablePagos((prev) =>
+      prev.map((p, idx) =>
+        idx < 12
+          ? { ...p, valor: Math.round(price / 12) } // solo cuotas 1..12
+          : p                                       // no tocar especiales
+      )
+    );
+
+  };
+
 
   const openCarteraModal = async (userId: string) => {
     try {
@@ -1107,37 +1477,189 @@ export default function EnrolledUsersPage() {
       setCurrentProgramId(programId);
 
       if (!programId) {
-        // Sin programa: modal vacío pero visible
-        const vacio = {
-          programaPrice: 0,
-          pagosUsuarioPrograma: [],
-          totalPagado: 0,
-          deuda: 0,
-        };
-        setCarteraInfo(vacio);
-        setEditablePagos(ensure15([]));
+        // ⬇️ AÚN SIN PROGRAMA: igual traemos pagos (programId=null)
+        setCurrentProgramId(null);
+
+        const pagosUsuarioPrograma = await fetchPagosUsuarioPrograma(userId, 'null');
+
+        // Totales básicos (sin depender de helpers externos)
+        const toNum = (v: unknown) =>
+          typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : 0;
+
+        const totalPagado = pagosUsuarioPrograma.reduce(
+          (s, p) => s + (Number.isFinite(toNum(p.valor)) ? toNum(p.valor) : 0),
+          0
+        );
+
+        // Solo cuotas 1..12 para deuda
+        const totalPagadoCuotas = pagosUsuarioPrograma
+          .filter((p) => {
+            const n = Number(p.nro_pago ?? p.nroPago ?? 0);
+            return Number.isFinite(n) && n >= 1 && n <= 12;
+          })
+          .reduce((s, p) => s + (Number.isFinite(toNum(p.valor)) ? toNum(p.valor) : 0), 0);
+
+        // Usa el precio por defecto que ya manejas (12 x 150000)
+        const programaPrice = DEFAULT_CUOTAS * DEFAULT_VALOR;
+        const deuda = Math.max(programaPrice - totalPagadoCuotas, 0);
+
+        setCarteraInfo({
+          programaPrice,
+          pagosUsuarioPrograma,
+          totalPagado,
+          deuda,
+          carnetPolizaUniforme: 0,
+          derechosGrado: 0,
+          planType: undefined,
+        });
+
+        // Mapea y muestra las cuotas reales
+        setEditablePagos(mapPagosToEditable(pagosUsuarioPrograma));
+        // 👇 NUEVO: actualizar el chip en la lista también cuando NO hay programa
+        setStudents((prev) =>
+          prev.map((s) =>
+            s.id === userId
+              ? {
+                ...s,
+                carteraStatus: shouldMarkNoVerificado(pagosUsuarioPrograma)
+                  ? 'no verificado'
+                  : s.carteraStatus,
+              }
+              : s
+          )
+        );
+
+
+
+        // Abrir modal
         setShowCarteraModal(true);
         return;
       }
 
-      // 1) Precio del programa
-      interface ProgramPriceResponse {
-        programaPrice?: number | null;
-      }
-      let programaPrice = 0;
-      const priceRes = await fetch(
-        `/api/super-admin/enroll_user_program?userId=${userId}&programId=${programId}`
-      );
-      if (priceRes.ok) {
-        const priceJson = (await priceRes.json()) as ProgramPriceResponse;
-        programaPrice = Number(priceJson.programaPrice ?? 0);
+      // ✅ Regla: si viene del backend, usar ese valor tal cual.
+      // Si no viene (o no es numérico), usar 1.800.000 (12 x 150.000).
+      let programaPrice = DEFAULT_VALOR * DEFAULT_CUOTAS; // 1.800.000 por defecto
+
+      try {
+        console.log('🧮 [PRICE] Fetching price_program', { userId, programId });
+        const res = await fetch(
+          `/api/super-admin/teams/price_program?userId=${userId}&programaId=${programId}`
+        );
+        console.log('🧮 [PRICE] status:', res.status);
+
+        if (res.ok) {
+          const data = (await res.json()) as { price?: number | string };
+          const raw = data?.price;
+          // normaliza por si llega "1.800.000" o "1,800,000"
+          const normalized =
+            typeof raw === 'number'
+              ? raw
+              : raw != null
+                ? Number(String(raw).replace(/[^\d.-]/g, ''))
+                : NaN;
+
+          console.log('🧮 [PRICE] backend ->', { raw, normalized });
+
+          if (Number.isFinite(normalized)) {
+            programaPrice = normalized; // 👉 usa exactamente lo del backend (ej: 150000 o 1800000)
+            console.log('✅ [PRICE] Usando precio del backend:', programaPrice);
+          } else {
+            programaPrice = DEFAULT_VALOR * DEFAULT_CUOTAS; // 1.800.000
+            console.warn('⚠️ [PRICE] Backend sin precio válido. Usando 1.800.000');
+          }
+        } else {
+          programaPrice = DEFAULT_VALOR * DEFAULT_CUOTAS; // 1.800.000
+          console.warn('⚠️ [PRICE] fetch NO OK. Usando 1.800.000. status=', res.status);
+        }
+      } catch (err) {
+        programaPrice = DEFAULT_VALOR * DEFAULT_CUOTAS; // 1.800.000
+        console.error('❌ [PRICE] Error de red. Usando 1.800.000', err);
       }
 
-      // 2) Pagos del usuario en ese programa
-      const pagosUsuarioPrograma = await fetchPagosUsuarioPrograma(
-        userId,
-        programId
-      );
+      console.log('🏁 [PRICE] programaPrice final:', programaPrice);
+
+
+      // 2️⃣ Pagos del usuario en ese programa
+      const pagosUsuarioPrograma = await fetchPagosUsuarioPrograma(userId, programId);
+
+      // Total pagado (todos los registros, igual que antes)
+      const totalPagado = pagosUsuarioPrograma.reduce((sum: number, p: Pago) => {
+        const v =
+          typeof p.valor === 'string'
+            ? Number(p.valor)
+            : typeof p.valor === 'number'
+              ? p.valor
+              : 0;
+        return sum + (Number.isFinite(v) ? v : 0);
+      }, 0);
+      // 👇 NUEVO: decide si el estado de cartera debe ser "no verificado" según la regla
+      function shouldMarkNoVerificado(arr: Pago[]): boolean {
+        if (!Array.isArray(arr) || arr.length === 0) return false;
+
+        const hoy = new Date();
+        const y = hoy.getFullYear();
+        const m = hoy.getMonth();
+
+        // pagos del MES actual con valor > 0 y fecha válida
+        const pagosMes = arr.filter((p) => {
+          const f = p?.fecha ? new Date(String(p.fecha)) : null;
+          const v = typeof p?.valor === 'number' ? p.valor : Number(p?.valor ?? 0);
+          return (
+            f && !isNaN(f.getTime()) &&
+            f.getFullYear() === y &&
+            f.getMonth() === m &&
+            v > 0
+          );
+        });
+
+        if (pagosMes.length === 0) return false;
+
+        // último por fecha
+        const ultimo = [...pagosMes].sort(
+          (a, b) =>
+            new Date(String(a.fecha)).getTime() - new Date(String(b.fecha)).getTime()
+        )[pagosMes.length - 1];
+
+        // condición: tiene recibo y está no verificado
+        return Boolean(ultimo?.receiptUrl) && ultimo?.receiptVerified === false;
+      }
+
+
+      // ➕ NUEVO: total pagado SOLO por las 12 cuotas (excluye los 3 especiales)
+      const ESPECIALES = new Set([
+        'PÓLIZA Y CARNET',
+        'POLIZA Y CARNET', // por si viene sin tilde
+        'UNIFORME',
+        'DERECHOS DE GRADO',
+      ]);
+
+      const esEspecial = (p: Pago) => {
+        const c = (typeof p.concepto === 'string' ? p.concepto : '')
+          .toUpperCase()
+          .trim();
+        if (ESPECIALES.has(c)) return true;
+        const n = Number(p.nro_pago ?? p.nroPago);
+        return Number.isFinite(n) && n >= 13; // también excluye si viene como 13/14/15
+      };
+
+      const totalPagadoCuotas = pagosUsuarioPrograma
+        .filter((p) => !esEspecial(p))
+        .reduce((sum: number, p: Pago) => {
+          const v =
+            typeof p.valor === 'string'
+              ? Number(p.valor)
+              : typeof p.valor === 'number'
+                ? p.valor
+                : 0;
+          return sum + (Number.isFinite(v) ? v : 0);
+        }, 0);
+
+      // ⬅️ Deuda = precio total - (solo cuotas)
+      const deuda = Math.max(programaPrice - totalPagadoCuotas, 0);
+
+
+
+      // Guardar en state
 
       // Montos detectados por concepto
       const toNumber = (v: unknown) =>
@@ -1148,33 +1670,18 @@ export default function EnrolledUsersPage() {
         );
         return toNumber(pago?.valor);
       };
-      const carnetPolizaUniforme = findMonto(/carnet|p[oó]liza|uniforme/);
-      const derechosGrado = findMonto(/derechos?\s+de\s+grado/);
+      void findMonto;
 
-      // 3) Totales y deuda
-      const totalPagado = pagosUsuarioPrograma.reduce(
-        (sum: number, p: Pago) => {
-          const v =
-            typeof p.valor === 'string'
-              ? Number(p.valor)
-              : typeof p.valor === 'number'
-                ? p.valor
-                : 0;
-          return sum + (Number.isFinite(v) ? v : 0);
-        },
-        0
-      );
-      const deuda = Math.max(Number(programaPrice ?? 0) - totalPagado, 0);
-
-      // Setear info + precargar la tabla editable
       setCarteraInfo({
         programaPrice,
         pagosUsuarioPrograma,
         totalPagado,
         deuda,
-        carnetPolizaUniforme,
-        derechosGrado,
+        carnetPolizaUniforme: 0, // o el valor real que corresponda
+        derechosGrado: 0,        // o el valor real que corresponda
+        planType: undefined,      // opcional
       });
+
 
       setEditablePagos(() => {
         const norm = mapPagosToEditable(pagosUsuarioPrograma);
@@ -1209,6 +1716,8 @@ export default function EnrolledUsersPage() {
     }
   };
 
+
+
   const markCarteraActivo = async () => {
     if (!carteraUserId) return;
     const res = await fetch('/api/super-admin/enroll_user_program', {
@@ -1231,6 +1740,8 @@ export default function EnrolledUsersPage() {
       alert('No se pudo actualizar el estado.');
     }
   };
+
+
 
   const uploadCarteraReceipt = async () => {
     if (!carteraUserId || !carteraReceipt) return;
@@ -1342,7 +1853,7 @@ export default function EnrolledUsersPage() {
           const displayName = s.isNew ? `${s.name} (NEW)` : s.name;
           const computedByDate =
             s.subscriptionEndDate &&
-            new Date(s.subscriptionEndDate) >= new Date()
+              new Date(s.subscriptionEndDate) >= new Date()
               ? 'activo' // al día
               : 'inactivo'; // en cartera
 
@@ -1358,8 +1869,8 @@ export default function EnrolledUsersPage() {
             planType: s.planType ?? undefined,
             customFields: s.customFields
               ? Object.fromEntries(
-                  Object.entries(s.customFields).map(([k, v]) => [k, String(v)])
-                )
+                Object.entries(s.customFields).map(([k, v]) => [k, String(v)])
+              )
               : undefined,
             inscripcionOrigen: s.inscripcionOrigen ?? 'artiefy',
             carteraStatus: s.carteraStatus ?? computedByDate, // 👈 añade esto
@@ -1528,10 +2039,13 @@ export default function EnrolledUsersPage() {
       [...students]
         // Filtro por programa seleccionado
         .filter((student) =>
-          selectedProgram
-            ? student.programTitles?.includes(selectedProgram)
+          selectedPrograms.length
+            ? (student.programTitles ?? []).some((t) =>
+              selectedPrograms.includes(String(t).trim())
+            )
             : true
         )
+
 
         // Filtros por columnas dinámicas (incluye customFields)
         .filter((student) =>
@@ -1542,6 +2056,38 @@ export default function EnrolledUsersPage() {
               ? student.customFields?.[key.split('.')[1]]
               : student[key as keyof Student];
 
+            // ⚠️ Caso especial: carteraStatus puede ser "derivado" = "No verificado"
+            if (key === 'carteraStatus') {
+              // base que viene guardada en el alumno
+              const base = safeToString(studentValue);
+
+              // estado UI derivado solo si es el alumno actualmente abierto y hay pagos en memoria
+              let ui = base;
+              if (student.id === currentUserId) {
+                const hoy = new Date();
+                const y = hoy.getFullYear();
+                const m = hoy.getMonth();
+
+                const pagosMes = (editablePagos ?? []).filter((p) => {
+                  const f = p?.fecha ? new Date(String(p.fecha)) : null;
+                  const v = typeof p?.valor === 'number' ? p.valor : Number(p?.valor ?? 0);
+                  return f && !isNaN(f.getTime()) && f.getFullYear() === y && f.getMonth() === m && v > 0;
+                });
+
+                if (pagosMes.length > 0) {
+                  const ultimo = [...pagosMes].sort(
+                    (a, b) => new Date(String(a.fecha)).getTime() - new Date(String(b.fecha)).getTime()
+                  )[pagosMes.length - 1];
+
+                  if (ultimo?.receiptUrl && ultimo?.receiptVerified === false) {
+                    ui = 'no verificado';
+                  }
+                }
+              }
+
+              return ui.toLowerCase().includes(value.toLowerCase());
+            }
+
             if (!studentValue) return false;
 
             if (key === 'subscriptionEndDate') {
@@ -1551,6 +2097,7 @@ export default function EnrolledUsersPage() {
 
             const safeStudentValue = safeToString(studentValue);
             return safeStudentValue.toLowerCase().includes(value.toLowerCase());
+
           })
         )
 
@@ -1573,13 +2120,13 @@ export default function EnrolledUsersPage() {
         .filter((s) =>
           filters.purchaseDateFrom
             ? (s.purchaseDate ? s.purchaseDate.split('T')[0] : '') >=
-              filters.purchaseDateFrom
+            filters.purchaseDateFrom
             : true
         )
         .filter((s) =>
           filters.purchaseDateTo
             ? (s.purchaseDate ? s.purchaseDate.split('T')[0] : '') <=
-              filters.purchaseDateTo
+            filters.purchaseDateTo
             : true
         )
 
@@ -1721,8 +2268,13 @@ export default function EnrolledUsersPage() {
     field: string,
     value: string
   ) => {
+    console.log('🔧 [updateStudentField] Iniciando actualización:', { userId, field, value });
+
     const student = students.find((s) => s.id === userId);
-    if (!student) return;
+    if (!student) {
+      console.error('❌ [updateStudentField] Estudiante no encontrado:', userId);
+      return;
+    }
 
     const updatedStudent = { ...student };
 
@@ -1745,6 +2297,7 @@ export default function EnrolledUsersPage() {
       userId: updatedStudent.id,
       firstName: firstName || '',
       lastName,
+      email: updatedStudent.email, // 📧 CRÍTICO: Siempre incluir el email
       role: updatedStudent.role ?? 'estudiante',
       status: updatedStudent.subscriptionStatus,
       permissions: [],
@@ -1757,36 +2310,47 @@ export default function EnrolledUsersPage() {
       purchaseDate: updatedStudent.purchaseDate,
       subscriptionEndDate: updatedStudent.subscriptionEndDate
         ? new Date(updatedStudent.subscriptionEndDate)
-            .toISOString()
-            .split('T')[0]
+          .toISOString()
+          .split('T')[0]
         : null,
       customFields: updatedStudent.customFields ?? {},
     };
 
+    console.log('📤 [updateStudentField] Payload completo:', JSON.stringify(payload, null, 2));
+    console.log('📧 [updateStudentField] Email en payload:', payload.email);
+
     if (field === 'programTitle') {
       const prog = programs.find((p) => p.title === value);
-      if (prog) payload.programId = Number(prog.id);
+      if (prog) {
+        payload.programId = Number(prog.id);
+        console.log('🎓 [updateStudentField] Programa encontrado:', prog.id);
+      }
     }
 
-    // 5. Si cambió de curso, añadimos courseId
     if (field === 'courseTitle') {
       const curso = availableCourses.find((c) => c.title === value);
-      if (curso) payload.courseId = Number(curso.id);
+      if (curso) {
+        payload.courseId = Number(curso.id);
+        console.log('📚 [updateStudentField] Curso encontrado:', curso.id);
+      }
     }
 
+    console.log('🚀 [updateStudentField] Enviando request a API...');
     const res = await fetch('/api/super-admin/udateUser/updateUserDinamic', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
+    console.log('📡 [updateStudentField] Response status:', res.status);
+
     if (!res.ok) {
       const data: unknown = await res.json();
-      if (!res.ok) {
-        const errorData = errorResponseSchema.parse(data);
-        alert(`❌ Error al guardar: ${errorData.error}`);
-      }
+      const errorData = errorResponseSchema.parse(data);
+      console.error('❌ [updateStudentField] Error del servidor:', errorData.error);
+      alert(`❌ Error al guardar: ${errorData.error}`);
     } else {
+      console.log('✅ [updateStudentField] Actualización exitosa');
       setStudents((prev) =>
         prev.map((s) => (s.id === userId ? updatedStudent : s))
       );
@@ -1876,7 +2440,8 @@ export default function EnrolledUsersPage() {
         message={infoDialogMessage}
         onClose={() => setInfoDialogOpen(false)}
       />
-      <div className="min-h-screen space-y-8 bg-gray-900 p-6 text-white">
+
+      <div className="print:hidden min-h-screen space-y-8 bg-gray-900 p-6 text-white">
         <div
           ref={headerRef}
           className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center"
@@ -1990,23 +2555,87 @@ export default function EnrolledUsersPage() {
             className="rounded border border-gray-700 bg-gray-800 p-2"
           />
 
-          <select
-            value={selectedProgram}
-            onChange={(e) => setSelectedProgram(e.target.value)}
-            className="rounded border border-gray-700 bg-gray-800 p-2"
-          >
-            <option value="">Todos los programas</option>
-            {Array.from(
-              new Set(students.flatMap((s) => s.programTitles ?? []))
-            ).map((title, idx) => (
-              <option
-                key={`${title?.trim() || 'prog'}-${idx}`}
-                value={title?.trim()}
+          {/* Filtro: Programas (multiselect con búsqueda y chips) */}
+          <div ref={programRef} className="relative">
+            <label className="mb-1 block text-sm text-gray-300">Programas</label>
+
+            {/* “Input” con chips + búsqueda */}
+            <div
+              onClick={() => setProgramOpen(true)}
+              className="flex min-h-[40px] w-full cursor-text flex-wrap items-center gap-1 rounded border border-gray-700 bg-gray-800 px-2 py-1 focus-within:ring-2 focus-within:ring-blue-500"
+            >
+              {selectedPrograms.length === 0 && (
+                <span className="px-1 text-sm text-gray-400">Selecciona programas…</span>
+              )}
+
+              {/* Chips seleccionados (reducidos / truncados) */}
+              {selectedPrograms.map((p) => (
+                <span
+                  key={p}
+                  className="group inline-flex max-w-[160px] items-center gap-1 truncate rounded bg-blue-700/70 px-2 py-0.5 text-xs"
+                  title={p}
+                >
+                  <span className="truncate">{p}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeProgram(p);
+                    }}
+                    className="opacity-80 transition group-hover:opacity-100"
+                    aria-label={`Quitar ${p}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+
+              {/* Input de búsqueda dentro del “input” */}
+              <input
+                type="text"
+                value={programQuery}
+                onChange={(e) => setProgramQuery(e.target.value)}
+                onFocus={() => setProgramOpen(true)}
+                placeholder={selectedPrograms.length ? '' : ''}
+                className="min-w-[80px] flex-1 bg-transparent text-sm text-white outline-none placeholder:text-gray-500"
+              />
+            </div>
+
+            {/* Dropdown de opciones */}
+            {programOpen && (
+              <div className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded border border-gray-700 bg-gray-800 shadow-xl">
+                {filteredProgramOptions.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-gray-400">Sin resultados</div>
+                ) : (
+                  filteredProgramOptions.map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => {
+                        toggleProgram(opt);
+                        setProgramQuery('');
+                      }}
+                      className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-700"
+                    >
+                      <span>{opt}</span>
+                      {selectedPrograms.includes(opt) && <span>✓</span>}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+
+            {selectedPrograms.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedPrograms([])}
+                className="mt-1 rounded bg-gray-700 px-2 py-1 text-xs"
               >
-                {title?.trim()}
-              </option>
-            ))}
-          </select>
+                Limpiar selección
+              </button>
+            )}
+          </div>
+
         </div>
 
         <div>
@@ -2034,15 +2663,15 @@ export default function EnrolledUsersPage() {
                         setSelectedStudents(
                           e.target.checked
                             ? Array.from(
-                                new Set([
-                                  ...selectedStudents,
-                                  ...displayedStudents.map((s) => s.id),
-                                ])
-                              )
+                              new Set([
+                                ...selectedStudents,
+                                ...displayedStudents.map((s) => s.id),
+                              ])
+                            )
                             : selectedStudents.filter(
-                                (id) =>
-                                  !displayedStudents.some((s) => s.id === id)
-                              )
+                              (id) =>
+                                !displayedStudents.some((s) => s.id === id)
+                            )
                         )
                       }
                       className="rounded border-white/20"
@@ -2168,18 +2797,57 @@ export default function EnrolledUsersPage() {
                         }
 
                         if (col.id === 'carteraStatus') {
-                          const esAlDia = raw === 'activo'; // 'activo' = al día
-                          const etiqueta = esAlDia ? 'Al día' : 'En cartera';
+                          // Estado base según el dato del alumno
+                          const esAlDiaBase = raw === 'activo';
+
+                          // 🔎 Reglas "No verificado" usando los pagos cargados del alumno actualmente abierto
+                          // (solo podemos evaluar para el alumno activo en la modal)
+                          const pagosParaEvaluar =
+                            student.id === currentUserId ? editablePagos : [];
+
+                          const hoy = new Date();
+                          const y = hoy.getFullYear();
+                          const m = hoy.getMonth();
+
+                          const pagosMes = pagosParaEvaluar.filter((p) => {
+                            const f = p?.fecha ? new Date(String(p.fecha)) : null;
+                            const v = typeof p?.valor === 'number' ? p.valor : Number(p?.valor ?? 0);
+                            return (
+                              f &&
+                              !isNaN(f.getTime()) &&
+                              f.getFullYear() === y &&
+                              f.getMonth() === m &&
+                              v > 0
+                            );
+                          });
+
+                          let etiqueta: 'Al día' | 'En cartera' | 'No verificado' =
+                            esAlDiaBase ? 'Al día' : 'En cartera';
+
+                          if (pagosMes.length > 0) {
+                            const ultimo = [...pagosMes].sort(
+                              (a, b) =>
+                                new Date(String(a.fecha)).getTime() -
+                                new Date(String(b.fecha)).getTime()
+                            )[pagosMes.length - 1];
+
+                            // ✔️ Si el último pago del mes tiene comprobante y está no verificado → "No verificado"
+                            if (ultimo?.receiptUrl && ultimo?.receiptVerified === false) {
+                              etiqueta = 'No verificado';
+                            }
+                          }
+
+                          const badgeClass =
+                            etiqueta === 'Al día'
+                              ? 'bg-green-600'
+                              : etiqueta === 'No verificado'
+                                ? 'bg-gray-600'
+                                : 'bg-red-600';
 
                           return (
-                            <td
-                              key={col.id}
-                              className="px-4 py-2 align-top whitespace-nowrap"
-                            >
+                            <td key={col.id} className="px-4 py-2 align-top whitespace-nowrap">
                               <span
-                                className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                  esAlDia ? 'bg-green-600' : 'bg-red-600'
-                                }`}
+                                className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass}`}
                                 title={etiqueta}
                               >
                                 {etiqueta}
@@ -2193,6 +2861,7 @@ export default function EnrolledUsersPage() {
                             </td>
                           );
                         }
+
 
                         // 2) columna Último curso
                         if (col.id === 'courseTitle') {
@@ -2759,11 +3428,10 @@ export default function EnrolledUsersPage() {
                                   : [...prev, col.id]
                               )
                             }
-                            className={`cursor-pointer rounded px-3 py-2 text-sm transition ${
-                              isSelected
-                                ? 'bg-blue-600 text-white'
-                                : 'text-gray-300 hover:bg-gray-600'
-                            }`}
+                            className={`cursor-pointer rounded px-3 py-2 text-sm transition ${isSelected
+                              ? 'bg-blue-600 text-white'
+                              : 'text-gray-300 hover:bg-gray-600'
+                              }`}
                           >
                             {col.label}
                           </div>
@@ -2904,7 +3572,7 @@ export default function EnrolledUsersPage() {
           </div>
         )}
         {showCarteraModal && currentUser && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="showCarteraModal fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
             <div className="max-h-[90vh] w-full max-w-[min(100vw-1rem,72rem)] overflow-y-auto rounded-lg bg-white text-gray-900 shadow-2xl dark:bg-gray-800 dark:text-gray-100">
               {/* CABECERA / LOGOS */}
               <div className="border-b border-gray-200 p-4 sm:p-6 dark:border-gray-700">
@@ -2997,8 +3665,8 @@ export default function EnrolledUsersPage() {
                     <span className="font-semibold">FIN SUSCRIPCIÓN: </span>
                     {currentUser.subscriptionEndDate
                       ? new Date(currentUser.subscriptionEndDate)
-                          .toISOString()
-                          .split('T')[0]
+                        .toISOString()
+                        .split('T')[0]
                       : '-'}
                   </p>
                   <p>
@@ -3022,9 +3690,8 @@ export default function EnrolledUsersPage() {
                         <th className="border-b border-gray-200 px-3 py-2 text-left dark:border-gray-600">
                           PRODUCTO
                         </th>
-                        <th className="border-b border-gray-200 px-3 py-2 text-center dark:border-gray-600">
-                          N° PAGO
-                        </th>
+                        <th className="border-b border-gray-200 px-3 py-2 text-left dark:border-gray-600">
+                          N° PAGO	                        </th>
                         <th className="border-b border-gray-200 px-3 py-2 text-left dark:border-gray-600">
                           FECHA DE PAGO
                         </th>
@@ -3034,11 +3701,18 @@ export default function EnrolledUsersPage() {
                         <th className="border-b border-gray-200 px-3 py-2 text-right dark:border-gray-600">
                           VALOR
                         </th>
+
+                        {/* 👇 NUEVA COLUMNA */}
+                        <th className="border-b border-gray-200 px-3 py-2 text-center dark:border-gray-600">
+                          VERIFICADO
+                        </th>
+
                         <th className="border-b border-gray-200 px-3 py-2 text-right dark:border-gray-600">
                           ACCIONES
                         </th>
                       </tr>
                     </thead>
+
                     {/* ───────────────────────────────────────────────────────── */}
                     {/* TABLA: 12 cuotas (ahora con select en Método de pago) */}
                     {/* ───────────────────────────────────────────────────────── */}
@@ -3056,38 +3730,31 @@ export default function EnrolledUsersPage() {
                             key={`cuota-${cuotaNum}`}
                             className="align-top odd:bg-white even:bg-gray-50 dark:odd:bg-gray-800 dark:even:bg-gray-900"
                           >
+                            {/* PRODUCTO */}
                             <td className="border-b border-gray-100 px-3 py-2 dark:border-gray-700">
                               <input
                                 type="text"
                                 value={row.concepto ?? `Cuota ${cuotaNum}`}
                                 onChange={(e) =>
-                                  handleCuotaChange(
-                                    idx,
-                                    'concepto',
-                                    e.target.value
-                                  )
+                                  handleCuotaChange(idx, 'concepto', e.target.value)
                                 }
                                 className="w-full rounded border border-gray-300 bg-white p-1 text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                               />
                             </td>
 
+                            {/* N° PAGO */}
                             <td className="border-b border-gray-100 px-3 py-2 text-center dark:border-gray-700">
                               <input
                                 type="text"
-                                value={String(
-                                  row.nro_pago ?? row.nroPago ?? cuotaNum
-                                )}
+                                value={String(row.nro_pago ?? row.nroPago ?? cuotaNum)}
                                 onChange={(e) =>
-                                  handleCuotaChange(
-                                    idx,
-                                    'nro_pago',
-                                    e.target.value
-                                  )
+                                  handleCuotaChange(idx, 'nro_pago', e.target.value)
                                 }
                                 className="w-24 rounded border border-gray-300 bg-white p-1 text-center text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                               />
                             </td>
 
+                            {/* FECHA */}
                             <td className="border-b border-gray-100 px-3 py-2 dark:border-gray-700">
                               <input
                                 type="date"
@@ -3097,37 +3764,28 @@ export default function EnrolledUsersPage() {
                                     : toISODateLike(editablePagos[idx]?.fecha)
                                 }
                                 onChange={(e) =>
-                                  handleCuotaChange(
-                                    idx,
-                                    'fecha',
-                                    e.target.value
-                                  )
+                                  handleCuotaChange(idx, 'fecha', e.target.value)
                                 }
                                 className="w-36 rounded border border-gray-300 bg-white p-1 text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                               />
                             </td>
 
-                            {/* SELECT método: Transferencia | Artiefy */}
+                            {/* MÉTODO */}
                             <td className="border-b border-gray-100 px-3 py-2 dark:border-gray-700">
                               <select
                                 value={row.metodo ?? ''}
                                 onChange={(e) =>
-                                  handleCuotaChange(
-                                    idx,
-                                    'metodo',
-                                    e.target.value
-                                  )
+                                  handleCuotaChange(idx, 'metodo', e.target.value)
                                 }
                                 className="w-full rounded border border-gray-300 bg-white p-1 text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                               >
                                 <option value="">—</option>
-                                <option value="Transferencia">
-                                  Transferencia
-                                </option>
+                                <option value="Transferencia">Transferencia</option>
                                 <option value="Artiefy">Artiefy</option>
                               </select>
                             </td>
 
+                            {/* VALOR */}
                             <td className="border-b border-gray-100 px-3 py-2 text-right tabular-nums dark:border-gray-700">
                               <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:justify-end">
                                 <input
@@ -3135,101 +3793,253 @@ export default function EnrolledUsersPage() {
                                   inputMode="numeric"
                                   value={rawValor.toString()}
                                   onChange={(e) =>
-                                    handleCuotaChange(
-                                      idx,
-                                      'valor',
-                                      e.target.value
-                                    )
+                                    handleCuotaChange(idx, 'valor', e.target.value)
                                   }
                                   className="w-28 rounded border border-gray-300 bg-white p-1 text-right text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                                 />
                               </div>
                             </td>
 
-                            <td className="border-b border-gray-100 px-3 py-2 text-right tabular-nums dark:border-gray-700">
-                              <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:justify-end">
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => savePagoRow(idx)}
-                                    className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
-                                  >
-                                    Guardar
-                                  </button>
+                            {/* VERIFICADO */}
+                            <td className="border-b border-gray-100 px-3 py-2 text-center dark:border-gray-700">
+                              <div className="flex flex-col items-center gap-1">
+                                <span
+                                  className={`rounded px-2 py-0.5 text-[10px] font-semibold ${editablePagos[idx]?.receiptVerified
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-gray-500 text-white'
+                                    }`}
+                                  title="Estado de verificación del comprobante"
+                                >
+                                  {editablePagos[idx]?.receiptVerified ? 'Verificado' : 'No verificado'}
+                                </span>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setPendingRowForReceipt(idx);
-                                      fileInputRef.current?.click();
-                                    }}
-                                    className="rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+                                {editablePagos[idx]?.verifiedReceiptUrl && (
+                                  <a
+                                    href={editablePagos[idx].verifiedReceiptUrl as string}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-[11px] underline"
+                                    title={
+                                      editablePagos[idx]?.verifiedReceiptName ?? 'Comprobante verificado'
+                                    }
                                   >
-                                    Subir comprobante
-                                  </button>
-
-                                  {editablePagos[idx]?.receiptUrl && (
-                                    <a
-                                      href={
-                                        editablePagos[idx].receiptUrl as string
-                                      }
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="ml-1 text-xs underline"
-                                      title={
-                                        editablePagos[idx]?.receiptName ??
-                                        'Comprobante'
-                                      }
-                                    >
-                                      Ver
-                                    </a>
-                                  )}
-                                </div>
+                                    Ver verificado
+                                  </a>
+                                )}
                               </div>
                             </td>
+
+                            <td className="border-b border-gray-100 px-3 py-2 text-right dark:border-gray-700">
+                              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                {/* Guardar */}
+                                <button
+                                  type="button"
+                                  onClick={() => savePagoRow(idx)}
+                                  className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
+                                  title="Guardar cambios de esta cuota"
+                                >
+                                  <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                                    <path d="M3 4a2 2 0 012-2h7l5 5v9a2 2 0 01-2 2H5a2 2 0 01-2-2V4zM5 4v4h6V4H5z" />
+                                  </svg>
+                                  Guardar
+                                </button>
+
+                                {/* Subir comprobante */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPendingRowForReceipt(idx);
+                                    fileInputRef.current?.click();
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400/60"
+                                  title="Subir comprobante"
+                                >
+                                  <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                                    <path d="M3 16a2 2 0 002 2h10a2 2 0 002-2v-5h-2v5H5V5h5V3H5a2 2 0 00-2 2v11z" />
+                                    <path d="M15 3h-3V1h5v5h-2V3z" />
+                                    <path d="M10 14l4-4h-3V5H9v5H6l4 4z" />
+                                  </svg>
+                                  Subir
+                                </button>
+
+                                {/* Ver comprobante (si existe) */}
+                                {editablePagos[idx]?.receiptUrl ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openReceiptPreview(
+                                        editablePagos[idx].receiptUrl!,
+                                        editablePagos[idx]?.receiptName ?? 'Comprobante'
+                                      )
+                                    }
+                                    className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700/60"
+                                    title={editablePagos[idx]?.receiptName ?? 'Ver comprobante'}
+                                  >
+                                    <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                                      <path d="M10 3c-5 0-8 7-8 7s3 7 8 7 8-7 8-7-3-7-8-7zm0 2a5 5 0 110 10A5 5 0 0110 5zm0 2a3 3 0 100 6 3 3 0 000-6z" />
+                                    </svg>
+                                    Ver
+                                  </button>
+                                ) : (
+                                  <span
+                                    className="inline-flex items-center gap-1 cursor-not-allowed rounded-md border border-dashed border-gray-300 px-2.5 py-1 text-xs text-gray-400 dark:border-gray-700 dark:text-gray-500"
+                                    title="Sin comprobante"
+                                  >
+                                    <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                                      <path d="M10 3c-5 0-8 7-8 7l2 2s3-7 6-7 6 7 6 7l2-2s-3-7-8-7z" />
+                                    </svg>
+                                    Ver
+                                  </span>
+                                )}
+
+                                {/* Badge de verificación (compacto) */}
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${editablePagos[idx]?.receiptVerified
+                                    ? 'bg-green-100 text-green-700 ring-1 ring-green-600/20 dark:bg-green-900/40 dark:text-green-300'
+                                    : 'bg-gray-100 text-gray-700 ring-1 ring-gray-600/20 dark:bg-gray-800 dark:text-gray-300'
+                                    }`}
+                                  title="Estado de verificación del comprobante"
+                                >
+                                  <svg
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                    className="h-3 w-3"
+                                    aria-hidden="true"
+                                  >
+                                    {editablePagos[idx]?.receiptVerified ? (
+                                      <path d="M16.707 5.293l-8 8-4-4 1.414-1.414L8.707 10.586l6.293-6.293 1.707 1z" />
+                                    ) : (
+                                      <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-5H9v2h2v-2zm0-8H9v6h2V5z" />
+                                    )}
+                                  </svg>
+                                  {editablePagos[idx]?.receiptVerified ? 'Verificado' : 'No verificado'}
+                                </span>
+
+                                {/* Verificar (solo si hay comprobante) */}
+                                {!!editablePagos[idx]?.receiptUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      const nro_pago = Number(
+                                        editablePagos[idx]?.nro_pago ??
+                                        editablePagos[idx]?.nroPago ??
+                                        (idx + 1)
+                                      );
+                                      const verifiedBy = clerkUser?.id ?? null; // ID real del admin (o null si no está logueado)
+                                      const programIdNum = currentProgramId ? Number(currentProgramId) : null;
+
+                                      const res = await fetch(
+                                        '/api/super-admin/enroll_user_program/programsUser/pagos/verify',
+                                        {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({
+                                            userId: carteraUserId,
+                                            programId: programIdNum,
+                                            nro_pago,
+                                            verified: true,
+                                            verifiedBy,
+                                          }),
+                                        }
+                                      );
+
+                                      if (!res.ok) {
+                                        const data = await res.json().catch(() => ({}));
+                                        alert(isErrorResponse(data) ? data.error : 'No se pudo verificar');
+                                        return;
+                                      }
+
+                                      const pagosRefrescados = await fetchPagosUsuarioPrograma(
+                                        carteraUserId!,
+                                        String(currentProgramId)
+                                      );
+                                      setEditablePagos(mapPagosToEditable(pagosRefrescados));
+                                      alert('✅ Comprobante verificado');
+                                    }}
+                                    className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-400/60"
+                                    title="Marcar como verificado"
+                                  >
+                                    <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                                      <path d="M10 2l2.39 4.84 5.34.78-3.86 3.76.91 5.31L10 14.77 4.22 16.7l.91-5.31L1.27 7.62l5.34-.78L10 2z" />
+                                    </svg>
+                                    Verificar
+                                  </button>
+                                )}
+
+                              </div>
+                            </td>
+
                           </tr>
                         );
+
                       })}
                     </tbody>
 
                     <tfoot>
-                      <tr className="bg-gray-50 font-semibold dark:bg-gray-900">
-                        <td className="px-3 py-2" colSpan={4}>
-                          VALOR PROGRAMA
+                      {/* Encabezado plan */}
+                      <tr>
+                        <td colSpan={5} className="px-3 py-3">
+                          <div className="flex justify-between items-center rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                            <span className="font-semibold text-gray-700 dark:text-gray-200">
+                              PLAN / VALOR PROGRAMA
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              className="w-32 text-right font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800 border rounded px-2 py-1"
+                              value={price ? String(price) : ''}             // muestra 150000
+                              onChange={(e) => {
+                                // acepta 150000, 150.000, 150,000 → siempre queda 150000
+                                const onlyDigits = e.target.value.replace(/\D/g, '');
+                                setPrice(onlyDigits ? parseInt(onlyDigits, 10) : 0);
+                              }}
+                              onBlur={handleSavePrice}
+                            />
+
+                          </div>
                         </td>
-                        <td className="px-3 py-2 text-right">
-                          {new Intl.NumberFormat('es-CO', {
-                            style: 'currency',
-                            currency: 'COP',
-                            maximumFractionDigits: 0,
-                          }).format(carteraInfo?.programaPrice ?? 0)}
+
+                      </tr>
+
+                      {/* Valor pagado */}
+                      <tr>
+                        <td colSpan={5} className="px-3 py-3">
+                          <div className="flex justify-between items-center rounded-lg bg-green-50 dark:bg-green-900/30 p-3">
+                            <span className="font-semibold text-green-700 dark:text-green-400">
+                              VALOR PAGADO
+                            </span>
+                            <span className="font-semibold text-green-700 dark:text-green-400">
+                              {new Intl.NumberFormat('es-CO', {
+                                style: 'currency',
+                                currency: 'COP',
+                                maximumFractionDigits: 0,
+                              }).format(carteraInfo?.totalPagado ?? 0)}
+                            </span>
+                          </div>
                         </td>
                       </tr>
-                      <tr className="bg-gray-50 dark:bg-gray-900">
-                        <td className="px-3 py-2 font-semibold" colSpan={4}>
-                          VALOR PAGADO
-                        </td>
-                        <td className="px-3 py-2 text-right font-semibold">
-                          {new Intl.NumberFormat('es-CO', {
-                            style: 'currency',
-                            currency: 'COP',
-                            maximumFractionDigits: 0,
-                          }).format(carteraInfo?.totalPagado ?? 0)}
-                        </td>
-                      </tr>
-                      <tr className="bg-gray-50 dark:bg-gray-900">
-                        <td className="px-3 py-2 font-semibold" colSpan={4}>
-                          DEUDA RESTANTE
-                        </td>
-                        <td className="px-3 py-2 text-right font-semibold text-red-600">
-                          {new Intl.NumberFormat('es-CO', {
-                            style: 'currency',
-                            currency: 'COP',
-                            maximumFractionDigits: 0,
-                          }).format(carteraInfo?.deuda ?? 0)}
+
+                      {/* Deuda restante */}
+                      <tr>
+                        <td colSpan={5} className="px-3 py-3">
+                          <div className="flex justify-between items-center rounded-lg bg-red-50 dark:bg-red-900/30 p-3">
+                            <span className="font-semibold text-red-700 dark:text-red-400">
+                              DEUDA RESTANTE
+                            </span>
+                            <span className="font-semibold text-red-700 dark:text-red-400">
+                              {new Intl.NumberFormat('es-CO', {
+                                style: 'currency',
+                                currency: 'COP',
+                                maximumFractionDigits: 0,
+                              }).format(carteraInfo?.deuda ?? 0)}
+                            </span>
+
+                          </div>
                         </td>
                       </tr>
                     </tfoot>
+
+
                   </table>
                   {/* ───────────────────────────────────────────────────────── */}
                   {/* TABLA APARTE: Conceptos especiales (13, 14, 15) */}
@@ -3300,12 +4110,12 @@ export default function EnrolledUsersPage() {
                                     type="date"
                                     value={
                                       typeof editablePagos[idxBase]?.fecha ===
-                                      'string'
+                                        'string'
                                         ? (editablePagos[idxBase]!
-                                            .fecha as string)
+                                          .fecha as string)
                                         : toISODateLike(
-                                            editablePagos[idxBase]?.fecha
-                                          )
+                                          editablePagos[idxBase]?.fecha
+                                        )
                                     }
                                     onChange={(e) =>
                                       handleCuotaChange(
@@ -3393,7 +4203,7 @@ export default function EnrolledUsersPage() {
                                               ?.receiptName ?? 'Comprobante'
                                           }
                                         >
-                                          Ver
+                                          Versosa
                                         </a>
                                       )}
                                     </div>
@@ -3477,15 +4287,169 @@ export default function EnrolledUsersPage() {
                     </div>
                   </div>
                 )}
+                {/* Contenido específico para impresión - agregarlo después del botón imprimir */}
+                <div id="printable-invoice" className="hidden print:block pointer-events-none">
+                  <div className="bg-white text-black p-8">
+                    {/* Cabecera */}
+                    <div className="flex items-center justify-between mb-6 border-b border-black pb-4">
+                      <div className="flex items-center gap-4">
+                        <Image
+                          src="/artiefy-logo.png"
+                          alt="Artiefy"
+                          width={120}
+                          height={36}
+                          className="h-9 w-auto object-contain"
+                          priority
+                        />
+                        <Image
+                          src="/logo-ponao.png"
+                          alt="PONAO"
+                          width={120}
+                          height={36}
+                          className="h-9 w-auto object-contain"
+                        />
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-semibold tracking-wide text-black">
+                          POLITÉCNICO NACIONAL DE ARTES Y OFICIOS
+                        </p>
+                        <h3 className="text-lg font-bold text-black">FACTURA PAGO DE MATRÍCULA</h3>
+                      </div>
+                    </div>
+
+                    {/* Info estudiante */}
+                    <div className="grid grid-cols-2 gap-6 mb-6 text-sm">
+                      <div className="space-y-2">
+                        <p className="text-black"><strong>NOMBRE ESTUDIANTE:</strong> {currentUser?.name ?? '-'}</p>
+                        <p className="text-black"><strong>CC:</strong> {currentUser?.document ?? currentUser?.id ?? '-'}</p>
+                        <p className="text-black"><strong>CELULAR:</strong> {currentUser?.phone ?? '-'}</p>
+                        <p className="text-black"><strong>PROGRAMA:</strong> {userPrograms?.[0]?.title ?? '—'}</p>
+                        <p className="text-black"><strong>FECHA:</strong> {new Date().toISOString().split('T')[0]}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-black"><strong>DIRECCIÓN:</strong> {currentUser?.address ?? '-'}</p>
+                        <p className="text-black"><strong>CIUDAD:</strong> {currentUser?.city ?? '-'}</p>
+                        <p className="text-black"><strong>EMAIL:</strong> {currentUser?.email ?? '-'}</p>
+                        <p className="text-black">
+                          <strong>ESTADO:</strong> {estadoCarteraUI}
+                        </p>
+                        <p className="text-black">
+                          <strong>FIN SUSCRIPCIÓN:</strong>{' '}
+                          {currentUser?.subscriptionEndDate
+                            ? new Date(currentUser.subscriptionEndDate).toISOString().split('T')[0]
+                            : '-'
+                          }
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tabla de pagos solo con información, sin inputs */}
+                    <table className="w-full border-collapse border border-black text-sm mb-6">
+                      <thead>
+                        <tr className="bg-white">
+                          <th className="border border-black px-3 py-2 text-left text-black font-bold">PRODUCTO</th>
+                          <th className="border border-black px-3 py-2 text-center text-black font-bold">N° PAGO</th>
+                          <th className="border border-black px-3 py-2 text-left text-black font-bold">FECHA DE PAGO</th>
+                          <th className="border border-black px-3 py-2 text-left text-black font-bold">MÉTODO DE PAGO</th>
+                          <th className="border border-black px-3 py-2 text-right text-black font-bold">VALOR</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Primero las 12 cuotas */}
+                        {Array.from({ length: 12 }, (_, idx) => {
+                          const cuotaNum = idx + 1;
+                          const row = editablePagos[idx] ?? {};
+                          const valor = typeof row.valor === 'number' ? row.valor : Number(row.valor ?? 0);
+
+                          return (
+                            <tr key={`print-cuota-${cuotaNum}`} className="bg-white">
+                              <td className="border border-black px-3 py-2 text-black">
+                                {row.concepto ?? `Cuota ${cuotaNum}`}
+                              </td>
+                              <td className="border border-black px-3 py-2 text-center text-black">
+                                {row.nro_pago ?? row.nroPago ?? cuotaNum}
+                              </td>
+                              <td className="border border-black px-3 py-2 text-black">
+                                {row.fecha ? new Date(row.fecha).toLocaleDateString('es-CO') : '-'}
+                              </td>
+                              <td className="border border-black px-3 py-2 text-black">
+                                {row.metodo ?? '-'}
+                              </td>
+                              <td className="border border-black px-3 py-2 text-right text-black">
+                                {formatCOP(valor)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+
+                        {/* Luego los conceptos especiales */}
+                        {[
+                          { label: 'PÓLIZA Y CARNET', idxBase: 12 },
+                          { label: 'UNIFORME', idxBase: 13 },
+                          { label: 'DERECHOS DE GRADO', idxBase: 14 },
+                        ].map(({ label, idxBase }) => {
+                          const row = editablePagos[idxBase] ?? {};
+                          const valor = typeof row.valor === 'number' ? row.valor : Number(row.valor ?? 0);
+
+                          return (
+                            <tr key={`print-especial-${idxBase}`} className="bg-white">
+                              <td className="border border-black px-3 py-2 text-black font-semibold">
+                                {row.concepto ?? label}
+                              </td>
+                              <td className="border border-black px-3 py-2 text-center text-black">
+                                {idxBase + 1}
+                              </td>
+                              <td className="border border-black px-3 py-2 text-black">
+                                {row.fecha ? new Date(row.fecha).toLocaleDateString('es-CO') : '-'}
+                              </td>
+                              <td className="border border-black px-3 py-2 text-black">
+                                {row.metodo ?? '-'}
+                              </td>
+                              <td className="border border-black px-3 py-2 text-right text-black">
+                                {formatCOP(valor)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+
+                    {/* Totales */}
+                    <div className="border-t border-black pt-4 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-black">PLAN / VALOR PROGRAMA:</span>
+                        <span className="font-semibold text-black">{formatCOP(price)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-black">VALOR PAGADO:</span>
+                        <span className="font-semibold text-black">{formatCOP(carteraInfo?.totalPagado ?? 0)}</span>
+                      </div>
+                      <div className="flex justify-between items-center border-t border-black pt-2">
+                        <span className="font-bold text-black text-lg">DEUDA RESTANTE:</span>
+                        <span className="font-bold text-black text-lg">{formatCOP(carteraInfo?.deuda ?? 0)}</span>
+                      </div>
+                    </div>
+
+                    {/* Pie de página opcional */}
+                    <div className="mt-8 pt-4 border-t border-black text-center text-xs text-black">
+                      <p>Este documento es un comprobante de los pagos registrados</p>
+                      <p>Fecha de impresión: {new Date().toLocaleString('es-CO')}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
               {/* FOOTER / BOTONES */}
               <div className="flex flex-col gap-2 border-t border-gray-200 p-4 sm:flex-row sm:justify-end dark:border-gray-700">
+
                 <button
-                  onClick={() => window.print()}
+                  onClick={handlePrint}
                   className="rounded bg-gray-200 px-4 py-2 font-semibold text-gray-900 hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
                 >
                   Imprimir / Guardar PDF
                 </button>
+
+
+
                 <button
                   onClick={() => setShowCarteraModal(false)}
                   className="rounded bg-gray-900 px-4 py-2 font-semibold text-white hover:bg-black dark:bg-gray-600 dark:hover:bg-gray-700"
@@ -3495,7 +4459,10 @@ export default function EnrolledUsersPage() {
               </div>
             </div>
           </div>
+
         )}
+
+
 
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
@@ -3593,6 +4560,70 @@ export default function EnrolledUsersPage() {
           </div>
         )}
       </div>
+      {/* Modal Vista previa de comprobante */}
+      {receiptPreview.open && receiptPreview.url && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4">
+          <div className="relative grid max-h-[90vh] w-full max-w-4xl grid-rows-[auto,1fr,auto] overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-gray-900">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+              <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {receiptPreview.name ?? 'Comprobante'}
+              </h3>
+              <button
+                onClick={closeReceiptPreview}
+                className="inline-flex items-center rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-gray-800"
+                aria-label="Cerrar"
+                title="Cerrar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Body (preview) */}
+            <div className="min-h-[50vh] overflow-auto bg-gray-50 dark:bg-gray-950">
+              {isPdfUrl(receiptPreview.url) ? (
+                <iframe
+                  src={receiptPreview.url}
+                  className="h-[70vh] w-full"
+                  title="Vista previa PDF"
+                />
+              ) : (
+                // Si no es PDF, mostramos imagen. (Usamos <img> para evitar necesitar domain config de Next/Image)
+                <div className="flex items-center justify-center p-3">
+                  <Image
+                    src={receiptPreview.url}
+                    alt={receiptPreview.name ?? 'Comprobante'}
+                    className="max-h-[70vh] max-w-full rounded-md shadow"
+                    width={800}
+                    height={600}
+                    style={{ objectFit: 'contain' }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-4 py-3 dark:border-gray-700">
+              <a
+                href={receiptPreview.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                Abrir en pestaña
+              </a>
+              <a
+                href={receiptPreview.url}
+                download={receiptPreview.name ?? 'comprobante'}
+                className="inline-flex items-center gap-1 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+              >
+                Descargar
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
     </>
   );
 }

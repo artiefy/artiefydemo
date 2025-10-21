@@ -37,8 +37,10 @@ export default function ProgramasPage() {
       <Header />
       <main className="container mx-auto px-4 py-12">
         <header className="mb-8">
-          <h1 className="text-primary text-3xl font-bold">Programas</h1>
-          <p className="text-primary mt-2">
+          <h1 className="text-3xl font-bold" style={{ color: '#01142B' }}>
+            Programas
+          </h1>
+          <p className="mt-2" style={{ color: '#01142B' }}>
             Explora todos los programas disponibles.
           </p>
         </header>

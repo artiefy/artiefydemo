@@ -3,9 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
-import { useRouter } from 'next/navigation';
 
-import { useUser } from '@clerk/nextjs';
 import {
   Check,
   Edit,
@@ -37,6 +35,7 @@ interface User {
   email: string;
   role: string;
   status: string;
+  phone?: string;             // 👈 nuevo
   selected?: boolean;
   isNew?: boolean;
   permissions?: string[]; // 👈 AGREGA ESTO
@@ -124,16 +123,32 @@ interface WhatsAppTemplate {
   langCode?: string;
 }
 
+// Tipado seguro del usuario “crudo” que puede venir con claves variadas
+interface RawUser {
+  id?: string | number;
+  firstName?: unknown;
+  first_name?: unknown;
+  lastName?: unknown;
+  last_name?: unknown;
+  email?: unknown;
+  role?: unknown;
+  status?: unknown;
+  phone?: unknown;
+  phoneNumber?: unknown;
+  primaryPhoneNumber?: { phoneNumber?: unknown } | null;
+  telefono?: unknown;
+  permissions?: unknown;
+}
+
+// Helpers para leer tipos seguros
+const asString = (v: unknown): string | undefined =>
+  typeof v === 'string' ? v : undefined;
+
+const asStringArray = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+
+
 export default function AdminDashboard() {
-  const { user, isLoaded } = useUser();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isLoaded && user && user.publicMetadata?.role !== 'super-admin') {
-      router.replace('/');
-    }
-  }, [user, isLoaded, router]);
-
   const [users, setUsers] = useState<User[]>([]);
   // 🔍 Estados de búsqueda y filtros
   const [searchQuery, setSearchQuery] = useState(''); // Búsqueda por nombre o correo
@@ -238,20 +253,27 @@ export default function AdminDashboard() {
   const [courses, setCourses] = useState<Course[]>([]);
 
   const handleUserSelection = useCallback((userId: string, email: string) => {
+    const u = users.find((x) => x.id === userId);
+    console.log('[UI] toggle selección', {
+      userId,
+      email,
+      phone: u?.phone ?? null,
+    });
+
     setSelectedUsers((prevSelected) =>
       prevSelected.includes(userId)
         ? prevSelected.filter((id) => id !== userId)
         : [...prevSelected, userId]
     );
 
-    setSelectedEmails((prevEmails) => {
-      if (prevEmails.includes(email)) {
-        return prevEmails.filter((e) => e !== email);
-      } else {
-        return [...prevEmails, email];
-      }
-    });
-  }, []);
+    setSelectedEmails((prevEmails) =>
+      prevEmails.includes(email)
+        ? prevEmails.filter((e) => e !== email)
+        : [...prevEmails, email]
+    );
+  }, [users]); // 👈 agrega 'users' como dependencia
+
+
 
   // 👉 Helper para descargar un archivo desde base64
   const downloadBase64File = (
@@ -408,6 +430,37 @@ export default function AdminDashboard() {
   }, []);
 
   const [allCourses, setAllCourses] = useState<Course[]>([]);
+  useEffect(() => {
+    if (!showEmailModal) return;
+
+    const onlyDigits = (s: string) => s.replace(/\D/g, '');
+    const countryDigits = codigoPais.replace('+', '');
+    const toLocal = (p?: string) => {
+      const d = onlyDigits(p ?? '');
+      return d.startsWith(countryDigits) ? d.slice(countryDigits.length) : d;
+    };
+
+    // teléfonos de los usuarios seleccionados que tengan phone
+    const phones = users
+      .filter(u => selectedUsers.includes(u.id) && u.phone)
+      .map(u => toLocal(u.phone!))
+      .filter(Boolean);
+
+    // usar functional update para NO depender de numerosLocales
+    setNumerosLocales(prev => {
+      const current = prev
+        ? prev.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+
+      const unique = Array.from(new Set([...current, ...phones]));
+      const next = unique.join(',');
+
+      // evita setear si no cambió (previene bucles innecesarios)
+      return next === prev ? prev : next;
+    });
+  }, [showEmailModal, selectedUsers, users, codigoPais]);
+
+
 
   // Cargar plantillas al abrir el modal de Email (no sólo cuando marcas el check)
   useEffect(() => {
@@ -416,6 +469,7 @@ export default function AdminDashboard() {
         if (!showEmailModal) return;
         setWaLoading(true);
         setWaError(null);
+
 
         interface WaGetOk {
           templates?: WhatsAppTemplate[];
@@ -563,7 +617,9 @@ export default function AdminDashboard() {
 
   const fetchPrograms = useCallback(async () => {
     try {
-      const res = await fetch('/api/super-admin/programs'); // Cambiado a endpoint correcto
+      const res = await fetch(
+        'server/actions/estudiantes/programs/getAllPrograms'
+      ); // Actualizar la ruta correcta
       if (!res.ok) throw new Error('Error al obtener programas');
 
       const rawData: unknown = await res.json();
@@ -575,8 +631,7 @@ export default function AdminDashboard() {
             item !== null &&
             'id' in item &&
             'title' in item &&
-            (typeof (item as { id: unknown }).id === 'string' ||
-              typeof (item as { id: unknown }).id === 'number') &&
+            typeof (item as { id: unknown }).id === 'string' &&
             typeof (item as { title: unknown }).title === 'string'
         )
       ) {
@@ -694,12 +749,25 @@ export default function AdminDashboard() {
     // ⚡ procesar los números para whatsapp
     let whatsappNumbers: string[] = [];
     if (sendWhatsapp && numerosLocales.trim()) {
-      whatsappNumbers = numerosLocales
-        .split(',')
-        .map((num) => num.trim())
-        .filter(Boolean)
-        .map((num) => `${codigoPais}${num}`);
+      const onlyDigits = (s: string) => s.replace(/\D/g, '');
+      const countryDigits = codigoPais.replace('+', '');
+
+      whatsappNumbers = Array.from(new Set(
+        numerosLocales
+          .split(',')
+          .map(n => n.trim())
+          .filter(Boolean)
+          .map((n) => {
+            const d = onlyDigits(n);
+            // si ya viene con el código de país, lo dejamos tal cual
+            if (d.startsWith(countryDigits)) return d;
+            // si no, lo prefijamos con el país seleccionado
+            return countryDigits + d;
+          })
+          .filter(d => d.length >= 10) // naive sanity check
+      ));
     }
+
 
     try {
       const formData = new FormData();
@@ -744,28 +812,28 @@ export default function AdminDashboard() {
 
           const body = useTemplate
             ? {
-                // ➜ SOLO PLANTILLA
-                to,
-                forceTemplate: true,
-                templateName: waSelectedTemplate,
-                languageCode:
-                  selectedWaTemplate?.language === 'es' ? 'es' : 'en_US',
-                variables: waVariables,
-              }
+              // ➜ SOLO PLANTILLA
+              to,
+              forceTemplate: true,
+              templateName: waSelectedTemplate,
+              languageCode:
+                selectedWaTemplate?.language === 'es' ? 'es' : 'en_US',
+              variables: waVariables,
+            }
             : textOnly
               ? {
-                  // ➜ SOLO TEXTO (ya existe sesión abierta de 24h)
-                  to,
-                  text: textMessage,
-                }
+                // ➜ SOLO TEXTO (ya existe sesión abierta de 24h)
+                to,
+                text: textMessage,
+              }
               : {
-                  // ➜ TEXTO + abrir sesión con plantilla de sesión (hello_world)
-                  to,
-                  text: textMessage,
-                  ensureSession: true,
-                  sessionTemplate: 'hello_world',
-                  sessionLanguage: 'en_US',
-                };
+                // ➜ TEXTO + abrir sesión con plantilla de sesión (hello_world)
+                to,
+                text: textMessage,
+                ensureSession: true,
+                sessionTemplate: 'hello_world',
+                sessionLanguage: 'en_US',
+              };
 
           const resp = await fetch('/api/super-admin/whatsapp', {
             method: 'POST',
@@ -1050,8 +1118,8 @@ export default function AdminDashboard() {
 
       const validUserData: ViewUserResponse = {
         id: String(userData.id),
-        firstName: firstName ?? 'Nombre no disponible',
-        lastName: lastName ?? 'Apellido no disponible',
+        firstName: firstName || 'Nombre no disponible',
+        lastName: lastName || 'Apellido no disponible',
         email: String(userData.email),
         profileImage: userData.profileImage ?? '/default-avatar.png',
         createdAt: userData.createdAt ?? 'Fecha no disponible',
@@ -1114,19 +1182,44 @@ export default function AdminDashboard() {
       const rawData: unknown = await res.json();
       if (!Array.isArray(rawData)) throw new Error('Datos inválidos recibidos');
 
-      const data: User[] = (rawData as User[]).map((item) => ({
-        id: String(item.id),
-        firstName: String(item.firstName),
-        lastName: String(item.lastName),
-        email: String(item.email),
-        role: String(item.role),
-        status: String(item.status),
-        permissions:
-          'permissions' in item && Array.isArray(item.permissions)
-            ? item.permissions
-            : [], // ✅ Asegura que `permissions` se guarden correctamente
-      }));
+      const rawList: RawUser[] = Array.isArray(rawData) ? (rawData as RawUser[]) : [];
 
+      const data: User[] = rawList.map((item) => {
+        const rawPhone =
+          asString(item.phone) ??
+          asString(item.phoneNumber) ??
+          asString(item.primaryPhoneNumber?.phoneNumber) ??
+          asString(item.telefono);
+
+        // 👉 normaliza a string | undefined (no null)
+        const phone: string | undefined =
+          rawPhone && rawPhone.trim() !== '' ? rawPhone.trim() : undefined;
+
+        const idVal = item.id;
+        const id =
+          typeof idVal === 'string' || typeof idVal === 'number' ? String(idVal) : '';
+
+        return {
+          id,
+          firstName: asString(item.firstName) ?? asString(item.first_name) ?? '',
+          lastName: asString(item.lastName) ?? asString(item.last_name) ?? '',
+          email: asString(item.email) ?? '',
+          role: asString(item.role) ?? 'sin-role',
+          status: asString(item.status) ?? 'activo',
+          // 👉 sólo agrega phone si existe (coincide con phone?: string)
+          ...(phone !== undefined ? { phone } : {}),
+          permissions: asStringArray(item.permissions),
+        };
+      });
+
+
+      console.table(
+        data.map((u) => ({
+          id: u.id,
+          email: u.email,
+          phone: u.phone,
+        })),
+      );
       setUsers(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -1640,11 +1733,10 @@ export default function AdminDashboard() {
           </button>
           <button
             onClick={() => handleMassUpdateStatus('activo')}
-            className={`group/button relative inline-flex items-center justify-center gap-1 overflow-hidden rounded-md px-2 py-1.5 text-xs transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm ${
-              selectedUsers.length === 0
-                ? 'cursor-not-allowed border border-gray-600 text-gray-500'
-                : 'border border-green-500/20 bg-green-500/10 text-green-500 hover:bg-green-500/20'
-            }`}
+            className={`group/button relative inline-flex items-center justify-center gap-1 overflow-hidden rounded-md px-2 py-1.5 text-xs transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm ${selectedUsers.length === 0
+              ? 'cursor-not-allowed border border-gray-600 text-gray-500'
+              : 'border border-green-500/20 bg-green-500/10 text-green-500 hover:bg-green-500/20'
+              }`}
             disabled={selectedUsers.length === 0}
           >
             <span className="relative z-10 font-medium">Activar</span>
@@ -1653,11 +1745,10 @@ export default function AdminDashboard() {
           </button>
           <button
             onClick={() => handleMassUpdateStatus('inactivo')}
-            className={`group/button relative inline-flex items-center justify-center gap-1 overflow-hidden rounded-md px-2 py-1.5 text-xs transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm ${
-              selectedUsers.length === 0
-                ? 'cursor-not-allowed border border-gray-600 text-gray-500'
-                : 'border border-red-500/20 bg-red-500/10 text-red-500 hover:bg-red-500/20'
-            }`}
+            className={`group/button relative inline-flex items-center justify-center gap-1 overflow-hidden rounded-md px-2 py-1.5 text-xs transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm ${selectedUsers.length === 0
+              ? 'cursor-not-allowed border border-gray-600 text-gray-500'
+              : 'border border-red-500/20 bg-red-500/10 text-red-500 hover:bg-red-500/20'
+              }`}
             disabled={selectedUsers.length === 0}
           >
             <span className="relative z-10 font-medium">Desactivar</span>
@@ -1666,11 +1757,10 @@ export default function AdminDashboard() {
           </button>
           <button
             onClick={handleMassRemoveRole}
-            className={`group/button relative inline-flex items-center justify-center gap-1 overflow-hidden rounded-md px-2 py-1.5 text-xs transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm ${
-              selectedUsers.length === 0
-                ? 'cursor-not-allowed border border-gray-600 text-gray-500'
-                : 'border border-yellow-500/20 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20'
-            }`}
+            className={`group/button relative inline-flex items-center justify-center gap-1 overflow-hidden rounded-md px-2 py-1.5 text-xs transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm ${selectedUsers.length === 0
+              ? 'cursor-not-allowed border border-gray-600 text-gray-500'
+              : 'border border-yellow-500/20 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20'
+              }`}
             disabled={selectedUsers.length === 0}
           >
             <span className="relative z-10 font-medium">Quitar Rol</span>
@@ -1734,11 +1824,10 @@ export default function AdminDashboard() {
                 setSendingEmails(false);
               }
             }}
-            className={`group/button relative inline-flex items-center justify-center gap-1 overflow-hidden rounded-md px-2 py-1.5 text-xs transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm ${
-              selectedUsers.length === 0
-                ? 'cursor-not-allowed border border-gray-600 text-gray-500'
-                : 'border border-blue-500/20 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20'
-            }`}
+            className={`group/button relative inline-flex items-center justify-center gap-1 overflow-hidden rounded-md px-2 py-1.5 text-xs transition-all sm:gap-2 sm:px-4 sm:py-2 sm:text-sm ${selectedUsers.length === 0
+              ? 'cursor-not-allowed border border-gray-600 text-gray-500'
+              : 'border border-blue-500/20 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20'
+              }`}
             disabled={selectedUsers.length === 0 || sendingEmails}
           >
             <span className="relative z-10 font-medium">
@@ -1935,22 +2024,20 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-2 py-3 sm:px-4 sm:py-4">
                         <div
-                          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                            user.status === 'activo'
-                              ? 'bg-green-500/10 text-green-500'
-                              : user.status === 'inactivo'
-                                ? 'bg-red-500/10 text-red-500'
-                                : 'bg-yellow-500/10 text-yellow-500'
-                          }`}
+                          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${user.status === 'activo'
+                            ? 'bg-green-500/10 text-green-500'
+                            : user.status === 'inactivo'
+                              ? 'bg-red-500/10 text-red-500'
+                              : 'bg-yellow-500/10 text-yellow-500'
+                            }`}
                         >
                           <div
-                            className={`mr-1 size-1.5 rounded-full sm:size-2 ${
-                              user.status === 'activo'
-                                ? 'bg-green-500'
-                                : user.status === 'inactivo'
-                                  ? 'bg-red-500'
-                                  : 'bg-yellow-500'
-                            }`}
+                            className={`mr-1 size-1.5 rounded-full sm:size-2 ${user.status === 'activo'
+                              ? 'bg-green-500'
+                              : user.status === 'inactivo'
+                                ? 'bg-red-500'
+                                : 'bg-yellow-500'
+                              }`}
                           />
                           <span className="hidden sm:inline">
                             {user.status}
@@ -2188,18 +2275,16 @@ export default function AdminDashboard() {
                   {/* Badges */}
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span
-                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${
-                        viewUser.status === 'activo'
-                          ? 'bg-green-500/10 text-green-400'
-                          : 'bg-red-500/10 text-red-400'
-                      }`}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${viewUser.status === 'activo'
+                        ? 'bg-green-500/10 text-green-400'
+                        : 'bg-red-500/10 text-red-400'
+                        }`}
                     >
                       <span
-                        className={`size-2 rounded-full ${
-                          viewUser.status === 'activo'
-                            ? 'bg-green-400'
-                            : 'bg-red-400'
-                        }`}
+                        className={`size-2 rounded-full ${viewUser.status === 'activo'
+                          ? 'bg-green-400'
+                          : 'bg-red-400'
+                          }`}
                       />
                       {viewUser.status}
                     </span>
@@ -2656,8 +2741,8 @@ export default function AdminDashboard() {
         onConfirm={
           confirmation?.onConfirm
             ? async () => {
-                await Promise.resolve(confirmation.onConfirm?.());
-              }
+              await Promise.resolve(confirmation.onConfirm?.());
+            }
             : async () => Promise.resolve()
         } // Asegura que `onConfirm` siempre devuelva una Promise<void></void>
         onCancel={() => setConfirmation(null)}
@@ -2788,11 +2873,17 @@ export default function AdminDashboard() {
             {sendWhatsapp && (
               <>
                 {/* ⬇️ Plantillas de WhatsApp */}
-                {/* ⬇️ Plantillas de WhatsApp */}
                 <div className="mb-3">
                   <label className="mb-1 block text-sm">
                     Plantilla de WhatsApp
                   </label>
+                  <div className="mb-2 text-xs text-gray-400">
+                    Teléfonos detectados de seleccionados:{' '}
+                    {users
+                      .filter((u) => selectedUsers.includes(u.id) && u.phone)
+                      .map((u) => u.phone)
+                      .join(', ') || '—'}
+                  </div>
 
                   {waLoading ? (
                     <div className="text-sm text-gray-400">
@@ -2825,10 +2916,10 @@ export default function AdminDashboard() {
                             tmpl.body.match(/\{\{\d+\}\}/g) ?? [];
                           setWaVariables(
                             tmpl.example?.slice(0, placeholders.length) ??
-                              Array.from(
-                                { length: placeholders.length },
-                                () => ''
-                              )
+                            Array.from(
+                              { length: placeholders.length },
+                              () => ''
+                            )
                           );
                         } else {
                           setWaVariables([]);
@@ -2952,9 +3043,13 @@ export default function AdminDashboard() {
                   type="text"
                   placeholder="Números locales separados por coma, ej: 3001234567,3012345678"
                   value={numerosLocales}
-                  onChange={(e) => setNumerosLocales(e.target.value)}
+                  onChange={(e) => {
+                    console.log('[WA][input] numerosLocales change →', e.target.value);
+                    setNumerosLocales(e.target.value);
+                  }}
                   className="mb-4 w-full rounded-lg border bg-gray-800 p-3 text-white"
                 />
+
               </>
             )}
 
